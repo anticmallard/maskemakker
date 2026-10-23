@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Strik</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Strik">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#f6f0e6" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1d1a17" media="(prefers-color-scheme: dark)">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app"></div>
+
+  <!-- Hidden file picker used by "Importér opskrift" -->
+  <input type="file" id="file-input" accept=".json,application/json" hidden>
+
+  <!-- Bottom sheet used for menus and the size picker -->
+  <dialog id="sheet" class="sheet"></dialog>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
