@@ -3,13 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Strik</title>
+  <title>MaskeMakker</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="Strik">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="theme-color" content="#f6f0e6" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#1d1a17" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-title" content="MaskeMakker">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#1A3519">
   <link rel="apple-touch-icon" href="icons/icon-180.png">
   <link rel="icon" href="icons/icon-192.png">
   <link rel="manifest" href="manifest.json">
@@ -18,10 +17,11 @@
 <body>
   <div id="app"></div>
 
-  <!-- Hidden file picker used by "Importér opskrift" -->
+  <!-- Hidden file pickers: pattern import, and project photo -->
   <input type="file" id="file-input" accept=".json,application/json" hidden>
+  <input type="file" id="photo-input" accept="image/*" hidden>
 
-  <!-- Bottom sheet used for menus and the size picker -->
+  <!-- Bottom sheet used for menus and confirmations -->
   <dialog id="sheet" class="sheet"></dialog>
 
   <script type="module" src="app.js"></script>

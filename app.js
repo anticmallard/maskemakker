@@ -1,9 +1,12 @@
-// app.js — screens and interaction. All saving goes through storage.js.
+// app.js — MaskeMakker: screens and interaction. All saving goes through storage.js.
 import * as store from './storage.js';
 
 const app = document.getElementById('app');
 const fileInput = document.getElementById('file-input');
+const photoInput = document.getElementById('photo-input');
 const sheet = document.getElementById('sheet');
+
+const TABS = ['materialer', 'teknikker', 'opskrift'];
 
 /* ---------- helpers ---------- */
 
@@ -15,11 +18,12 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
 
 /**
  * Turns pattern text into HTML:
- *  {88|100|112}      → the number for the chosen size (all of them if none chosen)
- *  [Video](https://…) → a live link
- *  **tekst**          → bold
+ *  {88|100|112}              → the number for the chosen size (all of them if none chosen)
+ *  [[udt]] [[indt-r|Indt-r]] → a tappable technique (opens the Teknikker tab)
+ *  [Video](https://…)        → a live link
+ *  **tekst**                 → bold
  */
-function renderText(text, sizeIndex) {
+function renderText(text, sizeIndex, techs) {
   let h = esc(text);
   h = h.replace(/\{([^{}]*\|[^{}]*)\}/g, (_, inner) => {
     const vals = inner.split('|').map((v) => v.trim());
@@ -27,23 +31,31 @@ function renderText(text, sizeIndex) {
     const v = vals[sizeIndex] ?? vals[vals.length - 1];
     return `<span class="num">${v === '-' ? '–' : v}</span>`;
   });
+  h = h.replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_, id, shown) => {
+    const key = id.trim();
+    const label = shown ?? id;
+    return techs && techs[key] ? `<a class="term" href="#tech" data-tech="${key}">${label}</a>` : label;
+  });
   h = h.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
     (_, t, u) => `<a href="${u}" target="_blank" rel="noopener" class="link">${playIcon}${t}</a>`);
   h = h.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   return h;
 }
 
-const playIcon = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7.5" fill="currentColor" opacity=".15"/><path d="M6.3 5v6l5-3z" fill="currentColor"/></svg>';
+/** Plain text version (for small labels): one size value, no markup. */
+const plain = (s, si) => String(s ?? '')
+  .replace(/\{([^{}]*)\}/g, (_, x) => { const v = x.split('|'); return (v[si ?? 0] ?? v[0]).trim(); })
+  .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_, id, shown) => shown ?? id)
+  .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+  .replace(/\*\*/g, '');
 
 /** Does this item (or section) apply to the chosen size? */
 const applies = (thing, si) => !thing.sizes || si == null || thing.sizes.includes(si);
-
 const isRow = (it) => it.type === 'row' || it.type === 'measure';
 
 /**
  * Every tickable row for the project's chosen size, in order.
- * Rows inside a repeat block get `repeat` (the block) so we know they belong together;
- * every row gets `sec` (its section's index).
+ * Rows inside a repeat block get `repeat` (the block); every row gets `sec` (its section index).
  */
 function visibleRows(project) {
   const si = project.sizeIndex;
@@ -66,10 +78,9 @@ function visibleRows(project) {
 const repsOf = (project, rep) => project.reps?.[rep.id] || 0;
 
 /**
- * Is this row done?
- * Rows in a repeat block are cleared at each "Ny gentagelse", so for the progress bar
- * they count as done once one repeat is finished — otherwise progress would jump backwards.
- * For "next row" they only count as done when actually ticked (or the repeats are finished).
+ * Is this row done? Rows in a repeat block are cleared at each "Ny gentagelse", so for the
+ * progress bar they count as done once one repeat is finished. For "next row" they only
+ * count when actually ticked (or the repeats are finished).
  */
 function rowDone(project, r, forProgress) {
   if (project.done[r.id]) return true;
@@ -85,6 +96,42 @@ function progress(project) {
   const done = rows.filter((r) => rowDone(project, r, true)).length;
   const next = rows.find((r) => !rowDone(project, r, false));
   return { rows, done, total: rows.length, pct: rows.length ? Math.round((done / rows.length) * 100) : 0, next };
+}
+
+const isStarted = (p) => !!p.started;
+const isFinished = (p) => { const pr = progress(p); return pr.total > 0 && pr.done === pr.total; };
+const photoOf = (p) => p.photo || p.pattern.photo || null;
+
+/** Techniques as a map by id. */
+const techMap = (pattern) => Object.fromEntries((pattern.techniques || []).map((t) => [t.id, t]));
+const shortLabel = (l) => plain(l).split('·')[0].trim();
+
+/** Where each technique is used, e.g. "Udtagninger P 1, P 5 · Baghoved Omg 3". */
+function techUsage(pattern, si) {
+  const usage = {};
+  pattern.sections.forEach((sec) => {
+    if (!applies(sec, si)) return;
+    const visit = (it) => {
+      if (!applies(it, si)) return;
+      const s = `${it.label || ''} ${it.text || ''}`;
+      for (const m of s.matchAll(/\[\[([^\]|]+)/g)) {
+        const id = m[1].trim();
+        const bySec = (usage[id] ||= new Map());
+        if (!bySec.has(sec.title)) bySec.set(sec.title, []);
+        const lbl = it.label ? shortLabel(it.label) : '';
+        if (lbl && !bySec.get(sec.title).includes(lbl)) bySec.get(sec.title).push(lbl);
+      }
+    };
+    sec.items.forEach((it) => {
+      visit(it);
+      if (it.type === 'repeat') { it.items.forEach(visit); if (it.until) visit(it.until); }
+    });
+  });
+  const out = {};
+  for (const [id, bySec] of Object.entries(usage)) {
+    out[id] = [...bySec].map(([t, lbls]) => (lbls.length ? `${t} ${lbls.join(', ')}` : t)).join(' · ');
+  }
+  return out;
 }
 
 /** Checks an imported pattern file and gives every item a stable id. */
@@ -109,41 +156,49 @@ function normalizePattern(p) {
   return p;
 }
 
-function toast(msg) {
+function toast(msg, ms = 2200) {
   const t = document.createElement('div');
   t.className = 'toast';
   t.textContent = msg;
   document.body.append(t);
   requestAnimationFrame(() => t.classList.add('show'));
-  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 2200);
+  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, ms);
 }
 
-/* ---------- bottom sheet ---------- */
+/* ---------- bottom sheet (menus and confirmations) ---------- */
 
-function openSheet(title, buttons) {
+function openSheet(title, buttons, onDismiss) {
   sheet.innerHTML = `
     <div class="sheet-inner">
       <div class="sheet-title">${esc(title)}</div>
       ${buttons.map((b, i) => `<button class="sheet-btn ${b.cls || ''}" data-i="${i}">${b.html ?? esc(b.label)}</button>`).join('')}
       <button class="sheet-btn cancel" data-i="-1">Annullér</button>
     </div>`;
+  const dismiss = () => { sheet.close(); onDismiss?.(); };
+  sheet.oncancel = (e) => { e.preventDefault(); dismiss(); };
   sheet.onclick = (e) => {
-    if (e.target === sheet) return sheet.close();
+    if (e.target === sheet) return dismiss();
     const btn = e.target.closest('[data-i]');
     if (!btn) return;
-    sheet.close();
     const b = buttons[+btn.dataset.i];
-    if (b) b.action();
+    if (!b) return dismiss();
+    sheet.close();
+    b.action();
   };
+  if (sheet.open) sheet.close();
   sheet.showModal();
 }
 
-/* ---------- import ---------- */
-
-function pickFile() {
-  fileInput.value = '';
-  fileInput.click();
+/** In-app "are you sure?" — resolves true or false. */
+function ask(question, label, danger = false) {
+  return new Promise((resolve) => {
+    openSheet(question, [{ label, cls: danger ? 'danger' : '', action: () => resolve(true) }], () => resolve(false));
+  });
 }
+
+/* ---------- import, photos, backup ---------- */
+
+function pickFile() { fileInput.value = ''; fileInput.click(); }
 
 fileInput.addEventListener('change', async () => {
   const file = fileInput.files[0];
@@ -157,44 +212,80 @@ fileInput.addEventListener('change', async () => {
       return;
     }
     const project = await createProject(normalizePattern(data));
-    location.hash = `#/p/${project.id}`;
+    go(`#/p/${project.id}`);
   } catch (err) {
-    alert('Kunne ikke importere filen.\n\n' + err.message);
+    toast('Kunne ikke importere filen: ' + err.message, 4500);
   }
 });
 
 async function createProject(pattern) {
-  const project = {
+  return store.saveProject({
     id: uid(),
     pattern,
     sizeIndex: pattern.sizes.length === 1 ? 0 : null,
     done: {},
+    have: {},
+    reps: {},
+    started: false,
     created: Date.now(),
-  };
-  return store.saveProject(project);
+  });
 }
 
 async function loadExample() {
   try {
     const res = await fetch('patterns/eksempel.json', { cache: 'no-store' });
     const project = await createProject(normalizePattern(await res.json()));
-    location.hash = `#/p/${project.id}`;
+    go(`#/p/${project.id}`);
   } catch {
-    alert('Kunne ikke hente eksemplet.');
+    toast('Kunne ikke hente eksemplet.');
   }
+}
+
+let photoTarget = null;
+function pickPhoto(project) { photoTarget = project; photoInput.value = ''; photoInput.click(); }
+
+photoInput.addEventListener('change', async () => {
+  const file = photoInput.files[0];
+  if (!file || !photoTarget) return;
+  try {
+    photoTarget.photo = await shrinkImage(file, 600);
+    await store.saveProject(photoTarget);
+    toast('Billede gemt');
+    route();
+  } catch {
+    toast('Kunne ikke læse billedet.');
+  }
+});
+
+/** Shrinks a photo to max 600 px so it fits comfortably in storage. */
+function shrinkImage(file, max) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const s = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * s);
+      c.height = Math.round(img.height * s);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(img.src);
+      resolve(c.toDataURL('image/jpeg', 0.8));
+    };
+    img.onerror = reject;
+    img.src = URL.createObjectURL(file);
+  });
 }
 
 async function exportBackup() {
   const projects = await store.listProjects();
-  const blob = new Blob([JSON.stringify({ kind: 'strik-backup', exported: new Date().toISOString(), projects }, null, 2)],
-    { type: 'application/json' });
-  const file = new File([blob], `strik-backup-${new Date().toISOString().slice(0, 10)}.json`, { type: 'application/json' });
+  const json = JSON.stringify({ kind: 'strik-backup', exported: new Date().toISOString(), projects }, null, 2);
+  const name = `maskemakker-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  const file = new File([json], name, { type: 'application/json' });
   if (navigator.canShare?.({ files: [file] })) {
     try { await navigator.share({ files: [file] }); return; } catch (e) { if (e.name === 'AbortError') return; }
   }
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = file.name;
+  a.href = URL.createObjectURL(file);
+  a.download = name;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
@@ -204,36 +295,47 @@ async function exportBackup() {
 async function renderHome() {
   releaseWakeLock();
   const projects = await store.listProjects();
+  const active = projects.filter((p) => !isFinished(p));
+  const finished = projects.filter(isFinished);
 
-  const cards = projects.map((p) => {
+  const card = (p) => {
     const pr = progress(p);
-    const size = p.sizeIndex == null ? 'Vælg størrelse' : p.pattern.sizes[p.sizeIndex];
-    const status = pr.total && pr.done === pr.total
-      ? '<span class="done-badge">Færdig</span>'
-      : pr.next ? `Næste: ${esc(stripMarkup(pr.next.label || 'pind'))}` : '';
+    const si = p.sizeIndex;
+    const photo = photoOf(p);
+    const nextSec = pr.next ? p.pattern.sections[pr.next.sec]?.title : '';
+    const meta = si == null
+      ? 'Størrelse ikke valgt'
+      : isFinished(p) ? `${esc(p.pattern.sizes[si])} · Færdig`
+      : `${esc(p.pattern.sizes[si])}${isStarted(p) && pr.next ? ` · ${esc(nextSec)} ${esc(shortLabel(pr.next.label || ''))}` : ''}`;
     return `
       <a class="card" href="#/p/${p.id}">
-        <div class="card-top">
-          <div>
-            <div class="card-title">${esc(p.pattern.title)}</div>
-            <div class="card-meta">${esc(p.pattern.designer || '')}${p.pattern.designer ? ' · ' : ''}${esc(size)}</div>
-          </div>
-          <div class="ring" style="--p:${pr.pct}"><span>${pr.pct}%</span></div>
+        <div class="card-pic ${photo ? '' : 'empty'}">
+          ${photo ? `<img src="${photo}" alt="">` : `<img class="knot-faded" src="icons/knot.png" alt=""><span class="add-pic">Tilføj billede</span>`}
+          ${isStarted(p) ? `<span class="pct-badge">${pr.pct}%</span>` : '<span class="new-badge">Ny</span>'}
         </div>
-        <div class="bar"><div style="width:${pr.pct}%"></div></div>
-        <div class="card-foot"><span>${pr.done} af ${pr.total} pinde</span><span>${status}</span></div>
+        <div class="card-body">
+          <div class="card-title">${esc(p.pattern.title)}</div>
+          <div class="card-meta">${meta}</div>
+          <div class="bar"><div style="width:${pr.pct}%"></div></div>
+        </div>
       </a>`;
-  }).join('');
+  };
 
   app.innerHTML = `
-    <header class="home-head">
-      <h1>Strik</h1>
-      <button class="icon-btn" id="home-menu" aria-label="Menu">${dotsIcon}</button>
+    <header class="brandbar">
+      <img class="brand-knot" src="icons/knot.png" alt="">
+      <h1 class="wordmark">MaskeMakker</h1>
+      <button class="icon-btn on-brand" id="home-menu" aria-label="Menu">${dotsIcon}</button>
     </header>
     <main class="home">
-      ${projects.length ? `<div class="cards">${cards}</div>` : `
+      ${projects.length ? `
+        <div class="group-label">I gang · ${active.length}</div>
+        ${active.length ? `<div class="cards">${active.map(card).join('')}</div>` : '<div class="placeholder">Ingen projekter i gang</div>'}
+        <div class="group-label">Færdige · ${finished.length}</div>
+        ${finished.length ? `<div class="cards">${finished.map(card).join('')}</div>` : '<div class="placeholder">Færdige projekter samles her</div>'}
+      ` : `
         <div class="empty">
-          <div class="empty-art">${yarnArt}</div>
+          <img class="empty-knot" src="icons/knot.png" alt="">
           <h2>Ingen projekter endnu</h2>
           <p>Importér en opskrift for at komme i gang.</p>
           <button class="link-btn" id="example">Prøv med en eksempelopskrift</button>
@@ -243,34 +345,192 @@ async function renderHome() {
 
   app.querySelector('#import').onclick = pickFile;
   app.querySelector('#example')?.addEventListener('click', loadExample);
-  app.querySelector('#home-menu').onclick = () => openSheet('Strik', [
+  app.querySelector('#home-menu').onclick = () => openSheet('MaskeMakker', [
     { label: 'Importér opskrift eller backup', action: pickFile },
     { label: 'Gem backup af alle projekter', action: exportBackup },
     { label: 'Tilføj eksempelopskrift', action: loadExample },
   ]);
 }
 
-const stripMarkup = (s) => String(s).replace(/\{([^{}]*)\}/g, (_, x) => x.split('|')[0]);
-
 /* ---------- project screen ---------- */
 
-async function renderProject(id) {
+// Remember where you were in the recipe while you look at another tab.
+const recipeScroll = {};
+let focusTech = null;   // technique tapped in the recipe
+let fromRow = null;     // the row it was tapped from
+let returnTo = null;    // row to scroll to when coming back from Teknikker
+
+async function renderProject(id, tab) {
   const project = await store.getProject(id);
-  if (!project) { location.hash = '#/'; return; }
+  if (!project) { go('#/'); return; }
+  // Older projects (before the tabs existed) count as started once a size was chosen.
+  if (project.started === undefined) project.started = project.sizeIndex != null;
+  project.have = project.have || {};
+
+  if (!TABS.includes(tab)) tab = isStarted(project) && project.sizeIndex != null ? 'opskrift' : 'materialer';
+
+  const pat = project.pattern;
+  const si = project.sizeIndex;
+  const techs = techMap(pat);
+  const pr = progress(project);
+  const photo = photoOf(project);
+  const nTech = (pat.techniques || []).length;
+
+  const tile = (key, label, icon, sub) => `
+    <a class="tile ${tab === key ? 'on' : ''}" href="#/p/${id}/${key}" ${tab === key ? 'aria-current="page"' : ''}>
+      ${icon}<span class="tile-label">${label}</span><span class="tile-sub">${sub}</span>
+    </a>`;
+
+  app.innerHTML = `
+    <header class="brandbar project">
+      <div class="proj-bar">
+        <a class="icon-btn on-brand" href="#/" aria-label="Tilbage">${backIcon}</a>
+        ${photo ? `<img class="proj-thumb" src="${photo}" alt="">` : `<span class="proj-thumb empty"><img src="icons/knot.png" alt=""></span>`}
+        <div class="proj-title">${esc(pat.title)}</div>
+        <button class="icon-btn on-brand" id="proj-menu" aria-label="Menu">${dotsIcon}</button>
+      </div>
+      <nav class="tiles">
+        ${tile('materialer', 'Materialer', yarnIcon, si == null ? 'Ikke valgt' : esc(pat.sizes[si]))}
+        ${tile('teknikker', 'Teknikker', bookIcon, nTech ? `${nTech} i opskriften` : 'Ingen')}
+        ${tile('opskrift', 'Opskrift', listIcon, !isStarted(project) ? 'Ikke startet' : `${pr.done} af ${pr.total} · ${pr.pct}%`)}
+      </nav>
+    </header>
+    <main class="proj" id="tab-body"></main>`;
+
+  const body = app.querySelector('#tab-body');
+  if (tab === 'materialer') renderMaterials(body, project);
+  if (tab === 'teknikker') renderTechniques(body, project);
+  if (tab === 'opskrift') renderRecipe(body, project, techs);
+
+  app.querySelector('#proj-menu').onclick = () => projectMenu(project, tab);
+
+  if (store.getSetting('wakeLock', false)) requestWakeLock();
+}
+
+/* ----- Materialer tab ----- */
+
+function renderMaterials(body, project) {
+  const pat = project.pattern;
+  const si = project.sizeIndex;
+  const details = pat.sizeDetails || [];
+  const started = isStarted(project);
+
+  const sizeBtns = pat.sizes.map((s, i) => `
+    <button class="size-btn ${i === si ? 'on' : ''}" data-size="${i}">
+      <b>${esc(s)}</b>${details[i] ? `<span>${esc(details[i])}</span>` : ''}
+    </button>`).join('');
+
+  const materials = (pat.materials || []).map((m, i) => `
+    <label class="check-row">
+      <input type="checkbox" data-have="${i}" ${project.have[i] ? 'checked' : ''}>
+      <span>${renderText(m.text, si)}</span>
+    </label>`).join('');
+
+  const gauge = (pat.gauge || []).map((g) => `
+    <div class="gauge-cell"><span>${esc(g.label)}</span><b>${renderText(g.text, si)}</b></div>`).join('');
+
+  // Older pattern files keep yarn and needles in "info"
+  const info = !pat.materials && pat.info ? pat.info.map((r) =>
+    `<div class="info-row"><dt>${esc(r.label)}</dt><dd>${renderText(r.text, si)}</dd></div>`).join('') : '';
+
+  const hint = [
+    pat.sizeDetailLabel && details.length ? `Cm = ${pat.sizeDetailLabel.toLowerCase()}.` : '',
+    started ? 'Skifter du størrelse, skifter alle tal i opskriften med.' : '',
+  ].filter(Boolean).join(' ');
+
+  body.innerHTML = `
+    <div class="tab-pad">
+      ${!started ? `
+        <h2 class="tab-title">Klar til at slå op?</h2>
+        <p class="tab-lead">Vælg størrelse først. Så viser opskriften og garnmængden kun dine tal.</p>` : ''}
+      ${pat.sizes.length > 1 ? `
+        <h3 class="block-title">Størrelse</h3>
+        <div class="size-grid">${sizeBtns}</div>
+        ${hint ? `<p class="hint">${hint}</p>` : ''}` : ''}
+      ${materials ? `<h3 class="block-title">Garn og pinde</h3><div class="panel">${materials}</div>` : ''}
+      ${gauge ? `<h3 class="block-title">Strikkefasthed</h3><div class="panel gauge">${gauge}</div>` : ''}
+      ${info ? `<h3 class="block-title">Garn, pinde og strikkefasthed</h3><dl class="panel info">${info}</dl>` : ''}
+      ${pat.intro ? `<h3 class="block-title">Om opskriften</h3><p class="intro">${pat.designer ? `<span class="designer">${esc(pat.designer)}</span><br>` : ''}${renderText(pat.intro, si)}</p>` : ''}
+      <div class="end-space"></div>
+    </div>
+    ${!started ? `<div class="dock"><button class="primary brand" id="start" ${si == null ? 'disabled' : ''}>${si == null ? 'Vælg størrelse for at starte' : 'Start strikning →'}</button></div>` : ''}`;
+
+  body.querySelectorAll('[data-size]').forEach((b) => b.onclick = async () => {
+    const y = window.scrollY;
+    project.sizeIndex = +b.dataset.size;
+    await store.saveProject(project);
+    await renderProject(project.id, 'materialer');
+    window.scrollTo(0, y);
+  });
+  body.querySelectorAll('[data-have]').forEach((c) => c.onchange = async () => {
+    if (c.checked) project.have[c.dataset.have] = true; else delete project.have[c.dataset.have];
+    await store.saveProject(project);
+  });
+  body.querySelector('#start')?.addEventListener('click', async () => {
+    project.started = true;
+    await store.saveProject(project);
+    go(`#/p/${project.id}/opskrift`);
+  });
+}
+
+/* ----- Teknikker tab ----- */
+
+function renderTechniques(body, project) {
+  const pat = project.pattern;
+  const si = project.sizeIndex;
+  const usage = techUsage(pat, si);
+  const list = pat.techniques || [];
+  const focus = focusTech;
+  const back = fromRow && focus
+    ? `<a class="pill brand" href="#/p/${project.id}/opskrift" data-back>← Tilbage til ${esc(shortLabel(fromRow.label || 'pinden'))}</a>` : '';
+
+  body.innerHTML = `
+    <div class="tab-pad">
+      ${list.length ? list.map((t) => `
+        <article class="tech ${t.id === focus ? 'focus' : ''}" id="tech-${esc(t.id)}">
+          <div class="tech-head"><h3>${esc(t.name)}</h3>${usage[t.id] ? `<span>${esc(usage[t.id])}</span>` : ''}</div>
+          ${t.text ? `<p>${renderText(t.text, si)}</p>` : ''}
+          ${t.video || t.id === focus ? `<div class="tech-actions">
+            ${t.video ? `<a class="pill" href="${esc(t.video)}" target="_blank" rel="noopener">${playIcon}Se video</a>` : ''}
+            ${t.id === focus ? back : ''}
+          </div>` : ''}
+        </article>`).join('') : '<p class="tab-lead">Denne opskrift har ingen teknikker beskrevet.</p>'}
+      <div class="end-space"></div>
+    </div>`;
+
+  body.querySelector('[data-back]')?.addEventListener('click', () => { returnTo = fromRow?.id; });
+  if (focus) {
+    const el = body.querySelector(`#tech-${CSS.escape(focus)}`);
+    requestAnimationFrame(() => el?.scrollIntoView({ block: 'center' }));
+  }
+  focusTech = null;
+}
+
+/* ----- Opskrift tab ----- */
+
+function renderRecipe(body, project, techs) {
   const pat = project.pattern;
   const si = project.sizeIndex;
 
-  const info = (pat.info || []).map((r) =>
-    `<div class="info-row"><dt>${esc(r.label)}</dt><dd>${renderText(r.text, si)}</dd></div>`).join('');
+  if (si == null) {
+    body.innerHTML = `<div class="tab-pad"><p class="tab-lead">Vælg en størrelse under Materialer, så viser opskriften dine tal.</p>
+      <a class="pill brand" href="#/p/${project.id}/materialer">Gå til Materialer</a></div>`;
+    return;
+  }
+
+  const sideChip = (side) => side === 'RS'
+    ? `<span class="side rs">${knitIcon}Retside</span>`
+    : side === 'VS' ? `<span class="side vs">${purlIcon}Vrangside</span>` : '';
 
   const rowHtml = (it) => {
     const done = !!project.done[it.id];
+    const side = it.side === 'RS' ? 'rs' : it.side === 'VS' ? 'vs' : '';
     return `
-      <div class="row ${it.type === 'measure' ? 'measure' : ''} ${done ? 'done' : ''}" data-id="${it.id}" role="checkbox" aria-checked="${done}" tabindex="0">
+      <div class="row ${it.type === 'measure' ? 'measure' : ''} ${side} ${done ? 'done' : ''}" data-id="${it.id}" role="checkbox" aria-checked="${done}" tabindex="0">
         <span class="check">${checkIcon}</span>
         <span class="row-body">
-          ${it.label ? `<span class="row-label">${it.type === 'measure' ? rulerIcon : ''}${renderText(it.label, si)}</span>` : ''}
-          <span class="row-text">${renderText(it.text, si)}</span>
+          ${it.label || it.side ? `<span class="row-label">${it.type === 'measure' ? rulerIcon : ''}<span>${renderText(it.label || '', si, techs)}</span>${sideChip(it.side)}</span>` : ''}
+          <span class="row-text">${renderText(it.text, si, techs)}</span>
         </span>
       </div>`;
   };
@@ -282,7 +542,7 @@ async function renderProject(id) {
         <span class="rep-count"></span>
       </div>
       ${it.items.filter((r) => applies(r, si)).map((r) =>
-        r.type === 'text' ? `<p class="note">${renderText(r.text, si)}</p>` : rowHtml(r)).join('')}
+        r.type === 'text' ? `<p class="note">${renderText(r.text, si, techs)}</p>` : rowHtml(r)).join('')}
       <div class="rep-foot">
         <button class="rep-undo" aria-label="Én gentagelse tilbage">−</button>
         <button class="rep-new">Ny gentagelse ↻</button>
@@ -293,7 +553,7 @@ async function renderProject(id) {
   const sections = pat.sections.map((sec, secIdx) => {
     if (!applies(sec, si)) return '';
     const items = sec.items.filter((it) => applies(it, si)).map((it) => {
-      if (it.type === 'text') return `<p class="note">${renderText(it.text, si)}</p>`;
+      if (it.type === 'text') return `<p class="note">${renderText(it.text, si, techs)}</p>`;
       if (it.type === 'repeat') return repeatHtml(it);
       return rowHtml(it);
     }).join('');
@@ -304,80 +564,98 @@ async function renderProject(id) {
       </section>`;
   }).join('');
 
-  // All repeat blocks in this pattern, by id
-  const repeats = {};
-  pat.sections.forEach((s) => s.items.forEach((it) => { if (it.type === 'repeat') repeats[it.id] = it; }));
-  const blockRows = (rep) => rep.items.filter((r) => isRow(r) && applies(r, project.sizeIndex));
+  // Sections for the segmented progress bar
+  const segSecs = pat.sections.map((s, i) => ({ s, i })).filter(({ s }) => applies(s, si));
 
-  app.innerHTML = `
-    <header class="proj-head">
-      <div class="proj-bar">
-        <a class="icon-btn" href="#/" aria-label="Tilbage">${backIcon}</a>
-        <div class="proj-title">${esc(pat.title)}</div>
-        <button class="icon-btn" id="proj-menu" aria-label="Menu">${dotsIcon}</button>
+  body.innerHTML = `
+    <div class="tab-pad">
+      <div class="progress-card">
+        <div class="pc-top"><b id="pc-pct"></b><span id="pc-count"></span></div>
+        <div class="segs">${segSecs.map(({ i }) => `<span class="seg" data-seg="${i}"><span></span></span>`).join('')}</div>
+        <div class="pc-now" id="pc-now"></div>
       </div>
-      <div class="proj-progress">
-        <button class="size-chip ${si == null ? 'empty' : ''}" id="size">${si == null ? 'Vælg størrelse' : 'Str. ' + esc(pat.sizes[si])} ▾</button>
-        <div class="bar"><div id="pbar"></div></div>
-        <span class="pct" id="ptext"></span>
-      </div>
-    </header>
-    <main class="proj ${si == null ? 'no-size' : ''}">
-      ${pat.designer || pat.intro ? `<div class="intro">
-        ${pat.designer ? `<div class="designer">${esc(pat.designer)}</div>` : ''}
-        ${pat.intro ? `<p>${renderText(pat.intro, si)}</p>` : ''}
-      </div>` : ''}
-      ${info ? `<details class="info"><summary>Garn, pinde og strikkefasthed</summary><dl>${info}</dl></details>` : ''}
       ${sections}
       <div class="end-space"></div>
-    </main>
+    </div>
     <button class="next-btn" id="next">Gå til næste pind ↓</button>`;
+
+  const repeats = {};
+  pat.sections.forEach((s) => s.items.forEach((it) => { if (it.type === 'repeat') repeats[it.id] = it; }));
+  const blockRows = (rep) => rep.items.filter((r) => isRow(r) && applies(r, si));
 
   const updateCounts = () => {
     const pr = progress(project);
-    app.querySelector('#pbar').style.width = pr.pct + '%';
-    app.querySelector('#ptext').textContent = `${pr.done}/${pr.total}`;
-    app.querySelectorAll('.sec').forEach((secEl) => {
+    body.querySelector('#pc-pct').textContent = `${pr.pct}% strikket`;
+    body.querySelector('#pc-count').textContent = `${pr.done} af ${pr.total} pinde`;
+    const current = pr.next?.sec;
+    body.querySelectorAll('.seg').forEach((seg) => {
+      const secRows = pr.rows.filter((r) => r.sec === +seg.dataset.seg);
+      const d = secRows.filter((r) => rowDone(project, r, true)).length;
+      seg.style.flexGrow = Math.max(secRows.length, 1);
+      seg.firstElementChild.style.width = secRows.length ? `${(d / secRows.length) * 100}%` : '0';
+      seg.classList.toggle('complete', secRows.length > 0 && d === secRows.length);
+    });
+    body.querySelector('#pc-now').innerHTML = pr.next
+      ? `Nu: <b>${esc(pat.sections[current].title)}</b> · ${esc(shortLabel(pr.next.label || 'næste pind'))}`
+      : '<b>Alle pinde er strikket</b>';
+    body.querySelectorAll('.sec').forEach((secEl) => {
       const secRows = pr.rows.filter((r) => r.sec === +secEl.dataset.sec);
       const d = secRows.filter((r) => rowDone(project, r, true)).length;
       secEl.querySelector('.sec-count').textContent = secRows.length ? `${d}/${secRows.length}` : '';
       secEl.classList.toggle('complete', secRows.length > 0 && d === secRows.length);
     });
-    app.querySelectorAll('.repeat').forEach((el) => {
+    body.querySelectorAll('.repeat').forEach((el) => {
       const rep = repeats[el.dataset.rep];
       const n = repsOf(project, rep);
       const finished = rep.until && project.done[rep.until.id];
       const allTicked = blockRows(rep).every((r) => project.done[r.id]);
+      const total = n + (allTicked ? 1 : 0);
       el.querySelector('.rep-count').textContent = finished
-        ? `Færdig · ${n + (allTicked ? 1 : 0)} ${n + (allTicked ? 1 : 0) === 1 ? 'gentagelse' : 'gentagelser'}`
+        ? `Færdig · ${total} ${total === 1 ? 'gentagelse' : 'gentagelser'}`
         : `Gentagelse ${n + 1}`;
       el.classList.toggle('finished', !!finished);
       el.querySelector('.rep-new').classList.toggle('ready', allTicked && !finished);
       el.querySelector('.rep-undo').hidden = n === 0;
     });
-    app.querySelector('#next').hidden = !pr.next;
+    body.querySelectorAll('.row.current').forEach((r) => r.classList.remove('current'));
+    if (pr.next) body.querySelector(`.row[data-id="${pr.next.id}"]`)?.classList.add('current');
+    body.querySelector('#next').hidden = !pr.next;
+    // Keep the Opskrift tile in the header in step
+    const sub = app.querySelector('.tile[href$="/opskrift"] .tile-sub');
+    if (sub && isStarted(project)) sub.textContent = `${pr.done} af ${pr.total} · ${pr.pct}%`;
   };
   updateCounts();
 
-  // Start the next repeat: count it, clear the block's ticks
+  const toggle = async (rowEl) => {
+    const rid = rowEl.dataset.id;
+    if (project.done[rid]) delete project.done[rid];
+    else project.done[rid] = Date.now();
+    rowEl.classList.toggle('done', !!project.done[rid]);
+    rowEl.setAttribute('aria-checked', !!project.done[rid]);
+    if (!project.started) project.started = true;
+    updateCounts();
+    await store.saveProject(project);
+    const pr = progress(project);
+    if (pr.total && pr.done === pr.total && project.done[rid]) toast('Færdig! 🧶');
+  };
+
   const newRepeat = async (el) => {
     const rep = repeats[el.dataset.rep];
     const rows = blockRows(rep);
     if (!rows.every((r) => project.done[r.id]) &&
-        !confirm('Ikke alle pinde i gentagelsen er krydset af. Start ny gentagelse alligevel?')) return;
+        !(await ask('Ikke alle pinde i gentagelsen er krydset af.', 'Start ny gentagelse alligevel'))) return;
     project.reps = project.reps || {};
     project.reps[rep.id] = repsOf(project, rep) + 1;
     for (const r of rows) delete project.done[r.id];
     if (rep.until) delete project.done[rep.until.id];
     el.querySelectorAll('.row.done').forEach((r) => { r.classList.remove('done'); r.setAttribute('aria-checked', false); });
-    app.querySelector(`.row[data-id="${rep.until?.id}"]`)?.classList.remove('done');
+    body.querySelector(`.row[data-id="${rep.until?.id}"]`)?.classList.remove('done');
     updateCounts();
     await store.saveProject(project);
     toast(`Gentagelse ${project.reps[rep.id] + 1}`);
     el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  // Step the counter back one (if you tapped "Ny gentagelse" by mistake)
   const undoRepeat = async (el) => {
     const rep = repeats[el.dataset.rep];
     if (!repsOf(project, rep)) return;
@@ -387,58 +665,54 @@ async function renderProject(id) {
     toast(`Tilbage til gentagelse ${project.reps[rep.id] + 1}`);
   };
 
-  // Tick / untick a row
-  const toggle = async (rowEl) => {
-    if (project.sizeIndex == null) { chooseSize(project); return; }
-    const rid = rowEl.dataset.id;
-    if (project.done[rid]) delete project.done[rid];
-    else project.done[rid] = Date.now();
-    rowEl.classList.toggle('done', !!project.done[rid]);
-    rowEl.setAttribute('aria-checked', !!project.done[rid]);
-    updateCounts();
-    await store.saveProject(project);
-    const pr = progress(project);
-    if (pr.total && pr.done === pr.total && project.done[rid]) toast('Færdig! 🧶');
-  };
-
-  app.querySelector('main').addEventListener('click', (e) => {
-    if (e.target.closest('a')) return;           // let video links open
+  body.addEventListener('click', (e) => {
+    const term = e.target.closest('.term');
+    if (term) {                                        // technique → Teknikker tab
+      e.preventDefault();
+      const rowEl = term.closest('.row');
+      focusTech = term.dataset.tech;
+      fromRow = rowEl ? visibleRows(project).find((r) => r.id === rowEl.dataset.id) : null;
+      recipeScroll[project.id] = window.scrollY;
+      go(`#/p/${project.id}/teknikker`);
+      return;
+    }
+    if (e.target.closest('a')) return;                 // video links open normally
     if (e.target.closest('.rep-new')) return newRepeat(e.target.closest('.repeat'));
     if (e.target.closest('.rep-undo')) return undoRepeat(e.target.closest('.repeat'));
     const rowEl = e.target.closest('.row');
     if (rowEl) toggle(rowEl);
   });
 
-  app.querySelector('#size').onclick = () => chooseSize(project);
-  app.querySelector('#next').onclick = () => {
-    const pr = progress(project);
-    const el = pr.next && app.querySelector(`.row[data-id="${pr.next.id}"]`);
-    if (!el) return;
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  const scrollToRow = (rid, smooth) => {
+    const el = rid && body.querySelector(`.row[data-id="${rid}"]`);
+    if (!el) return false;
+    el.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'center' });
     el.classList.add('flash');
     setTimeout(() => el.classList.remove('flash'), 1200);
+    return true;
   };
-  app.querySelector('#proj-menu').onclick = () => projectMenu(project);
 
-  if (store.getSetting('wakeLock', false)) requestWakeLock();
-  if (si == null) setTimeout(() => chooseSize(project), 250);
+  body.querySelector('#next').onclick = () => scrollToRow(progress(project).next?.id, true);
+
+  // Coming back: to the row you left from, else where you were, else the next row.
+  requestAnimationFrame(() => {
+    const target = returnTo;
+    returnTo = null;
+    if (target && scrollToRow(target, false)) return;
+    if (recipeScroll[project.id] != null) { window.scrollTo(0, recipeScroll[project.id]); return; }
+    const next = progress(project).next;
+    if (next && Object.keys(project.done).length) scrollToRow(next.id, false);
+  });
+
+  // Remember the scroll position while you're in the recipe
+  window.__recipeScroll = () => { recipeScroll[project.id] = window.scrollY; };
+  window.addEventListener('scroll', window.__recipeScroll, { passive: true });
 }
 
-function chooseSize(project) {
-  openSheet('Vælg størrelse', project.pattern.sizes.map((s, i) => ({
-    html: `${esc(s)}${i === project.sizeIndex ? ' <span class="tick">✓</span>' : ''}`,
-    action: async () => {
-      project.sizeIndex = i;
-      await store.saveProject(project);
-      renderProject(project.id);
-    },
-  })));
-}
-
-function projectMenu(project) {
+function projectMenu(project, tab) {
   const wake = store.getSetting('wakeLock', false);
   openSheet(project.pattern.title, [
-    { label: 'Skift størrelse', action: () => chooseSize(project) },
+    { label: photoOf(project) ? 'Skift billede' : 'Tilføj billede', action: () => pickPhoto(project) },
     {
       label: wake ? 'Hold skærmen tændt: Til' : 'Hold skærmen tændt: Fra',
       action: () => {
@@ -450,19 +724,19 @@ function projectMenu(project) {
     {
       label: 'Nulstil fremskridt',
       action: async () => {
-        if (!confirm('Fjern alle flueben i dette projekt?')) return;
+        if (!(await ask('Fjern alle flueben i dette projekt?', 'Nulstil fremskridt', true))) return;
         project.done = {};
         project.reps = {};
         await store.saveProject(project);
-        renderProject(project.id);
+        renderProject(project.id, tab);
       },
     },
     {
       label: 'Slet projekt', cls: 'danger',
       action: async () => {
-        if (!confirm(`Slet "${project.pattern.title}"? Det kan ikke fortrydes.`)) return;
+        if (!(await ask(`Slet "${project.pattern.title}"? Det kan ikke fortrydes.`, 'Slet projekt', true))) return;
         await store.deleteProject(project.id);
-        location.hash = '#/';
+        go('#/');
       },
     },
   ]);
@@ -486,22 +760,34 @@ document.addEventListener('visibilitychange', () => {
 
 /* ---------- routing ---------- */
 
+function go(hash) {
+  if (location.hash === hash) route();
+  else location.hash = hash;
+}
+
 function route() {
-  const m = location.hash.match(/^#\/p\/(.+)$/);
-  if (m) renderProject(m[1]);
-  else renderHome();
+  if (window.__recipeScroll) window.removeEventListener('scroll', window.__recipeScroll);
+  window.__recipeScroll = null;
+  const m = location.hash.match(/^#\/p\/([^/]+)(?:\/(\w+))?$/);
   window.scrollTo(0, 0);
+  if (m) renderProject(m[1], m[2]);
+  else renderHome();
 }
 window.addEventListener('hashchange', route);
 
 /* ---------- icons ---------- */
 
-const dotsIcon = '<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>';
-const backIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>';
-const checkIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12.5l4 4 8-9"/></svg>';
-const rulerIcon = '<svg class="ruler" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2.5" y="8" width="19" height="8" rx="1.5"/><path d="M7 8v3M11 8v4M15 8v3M19 8v4"/></svg>';
-const repeatIcon = '<svg class="rep-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11a7 7 0 0 1 12-4.9L19 9"/><path d="M19 4v5h-5"/><path d="M20 13a7 7 0 0 1-12 4.9L5 15"/><path d="M5 20v-5h5"/></svg>';
-const yarnArt = '<svg viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><circle cx="60" cy="62" r="38"/><path d="M26 48c20 6 48 4 68-12M23 66c26 6 58 2 74-18M30 84c24 4 52-2 66-24M44 28c-6 22-4 52 10 70M62 24c-8 26-4 56 14 72"/><path d="M96 82c8 6 10 14 4 22"/></svg>';
+const playIcon = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3v10l8-5z" fill="currentColor"/></svg>';
+const dotsIcon = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>';
+const backIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>';
+const checkIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 12.5l4 4 8-9"/></svg>';
+const rulerIcon = '<svg class="ruler" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="2.5" y="8" width="19" height="8" rx="1.5"/><path d="M7 8v3M11 8v4M15 8v3M19 8v4"/></svg>';
+const repeatIcon = '<svg class="rep-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11a7 7 0 0 1 12-4.9L19 9"/><path d="M19 4v5h-5"/><path d="M20 13a7 7 0 0 1-12 4.9L5 15"/><path d="M5 20v-5h5"/></svg>';
+const knitIcon = '<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M2 3l4 6 4-6"/></svg>';
+const purlIcon = '<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M2 6h8"/></svg>';
+const yarnIcon = '<svg class="tile-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="13" r="7"/><path d="M5 11c4 1 8 0 11-4M6 16c4 1 9-1 11-5"/><path d="M16 4l5-1"/></svg>';
+const bookIcon = '<svg class="tile-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h6a2 2 0 0 1 2 2v12a2 2 0 0 0-2-2H4z"/><path d="M20 5h-6a2 2 0 0 0-2 2v12a2 2 0 0 1 2-2h6z"/></svg>';
+const listIcon = '<svg class="tile-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7l2 2 3-3M4 15l2 2 3-3M12 8h8M12 16h8"/></svg>';
 
 /* ---------- start ---------- */
 
