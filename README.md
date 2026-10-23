@@ -1,4 +1,4 @@
-# MaskeMakker — knitting tracker (version 1)
+# Maskemakker — knitting tracker (version 1)
 
 A home-screen web app for iPhone. Progress is saved on the phone only.
 
@@ -82,6 +82,8 @@ Menu (•••) on the home screen → **Gem backup af alle projekter**. Save t
 - `side`: `"RS"` (retside, mustard) or `"VS"` (vrangside, lilac). Leave it out for rounds.
 - `[Se video](https://…)` — a live link. `**text**` — bold.
 - `"sizes": [0, 2]` on a row or section — only show it for those sizes (0 = first size).
+- `"numberFrom": 16` on a `repeat` — the rows get running P numbers that keep counting with each repeat (P 16–23, then P 24–31 …). Each row's own `label` (e.g. "mønster p 1") is shown small next to it.
+- Section titles follow the pattern's own headlines, and text that isn't a row goes between the rows as `text` items.
 - `repeat` — a block of rows knitted over and over. Tick the rows, tap **Ny gentagelse**: ticks clear and the counter goes up. **−** steps the counter back. Ticking the `until` row ends the repeats.
 - Rows like "pind 2–4" are written out as three separate rows; "til arbejdet måler X cm" is one `measure` row.
 

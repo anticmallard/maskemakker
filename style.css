@@ -305,6 +305,7 @@ a { color: inherit; }
 .row-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .row-label { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-weight: 700; font-size: 15px; }
 .row-text { overflow-wrap: anywhere; }
+.sub-label { font-size: 12px; font-weight: 600; color: var(--muted); }
 .ruler { width: 18px; height: 18px; color: var(--muted); }
 
 .side {

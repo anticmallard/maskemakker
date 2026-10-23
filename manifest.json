@@ -1,6 +1,6 @@
 {
-  "name": "MaskeMakker",
-  "short_name": "MaskeMakker",
+  "name": "Maskemakker",
+  "short_name": "Maskemakker",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

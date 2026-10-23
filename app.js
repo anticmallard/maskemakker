@@ -1,4 +1,4 @@
-// app.js — MaskeMakker: screens and interaction. All saving goes through storage.js.
+// app.js — Maskemakker: screens and interaction. All saving goes through storage.js.
 import * as store from './storage.js';
 
 const app = document.getElementById('app');
@@ -65,7 +65,8 @@ function visibleRows(project) {
     for (const it of sec.items) {
       if (!applies(it, si)) continue;
       if (it.type === 'repeat') {
-        for (const r of it.items) if (isRow(r) && applies(r, si)) rows.push({ ...r, repeat: it, sec: secIdx });
+        let ri = 0;
+        for (const r of it.items) if (isRow(r) && applies(r, si)) rows.push({ ...r, repeat: it, ri: ri++, sec: secIdx });
         if (it.until) rows.push({ ...it.until, sec: secIdx });
       } else if (isRow(it)) {
         rows.push({ ...it, sec: secIdx });
@@ -76,6 +77,17 @@ function visibleRows(project) {
 }
 
 const repsOf = (project, rep) => project.reps?.[rep.id] || 0;
+
+/**
+ * Running P number for a row in a numbered repeat block ("numberFrom"): the numbers keep
+ * counting with each repeat, e.g. P 16–23 in the first, P 24–31 in the second.
+ */
+const repNumber = (project, rep, ri) =>
+  rep.numberFrom + repsOf(project, rep) * rep.items.filter((r) => isRow(r) && applies(r, project.sizeIndex)).length + ri;
+
+/** The short label shown for a row outside the recipe list (home card, progress card, back button). */
+const displayLabel = (project, r) =>
+  r.repeat && r.repeat.numberFrom != null ? `P ${repNumber(project, r.repeat, r.ri)}` : shortLabel(r.label || '');
 
 /**
  * Is this row done? Rows in a repeat block are cleared at each "Ny gentagelse", so for the
@@ -306,7 +318,7 @@ async function renderHome() {
     const meta = si == null
       ? 'Størrelse ikke valgt'
       : isFinished(p) ? `${esc(p.pattern.sizes[si])} · Færdig`
-      : `${esc(p.pattern.sizes[si])}${isStarted(p) && pr.next ? ` · ${esc(nextSec)} ${esc(shortLabel(pr.next.label || ''))}` : ''}`;
+      : `${esc(p.pattern.sizes[si])}${isStarted(p) && pr.next ? ` · ${esc(nextSec)} ${esc(displayLabel(p, pr.next))}` : ''}`;
     return `
       <a class="card" href="#/p/${p.id}">
         <div class="card-pic ${photo ? '' : 'empty'}">
@@ -324,7 +336,7 @@ async function renderHome() {
   app.innerHTML = `
     <header class="brandbar">
       <img class="brand-knot" src="icons/knot.png" alt="">
-      <h1 class="wordmark">MaskeMakker</h1>
+      <h1 class="wordmark">Maskemakker</h1>
       <button class="icon-btn on-brand" id="home-menu" aria-label="Menu">${dotsIcon}</button>
     </header>
     <main class="home">
@@ -345,7 +357,7 @@ async function renderHome() {
 
   app.querySelector('#import').onclick = pickFile;
   app.querySelector('#example')?.addEventListener('click', loadExample);
-  app.querySelector('#home-menu').onclick = () => openSheet('MaskeMakker', [
+  app.querySelector('#home-menu').onclick = () => openSheet('Maskemakker', [
     { label: 'Importér opskrift eller backup', action: pickFile },
     { label: 'Gem backup af alle projekter', action: exportBackup },
     { label: 'Tilføj eksempelopskrift', action: loadExample },
@@ -482,7 +494,7 @@ function renderTechniques(body, project) {
   const list = pat.techniques || [];
   const focus = focusTech;
   const back = fromRow && focus
-    ? `<a class="pill brand" href="#/p/${project.id}/opskrift" data-back>← Tilbage til ${esc(shortLabel(fromRow.label || 'pinden'))}</a>` : '';
+    ? `<a class="pill brand" href="#/p/${project.id}/opskrift" data-back>← Tilbage til ${esc(displayLabel(project, fromRow) || 'pinden')}</a>` : '';
 
   body.innerHTML = `
     <div class="tab-pad">
@@ -522,14 +534,18 @@ function renderRecipe(body, project, techs) {
     ? `<span class="side rs">${knitIcon}Retside</span>`
     : side === 'VS' ? `<span class="side vs">${purlIcon}Vrangside</span>` : '';
 
-  const rowHtml = (it) => {
+  const rowHtml = (it, rep, ri) => {
     const done = !!project.done[it.id];
     const side = it.side === 'RS' ? 'rs' : it.side === 'VS' ? 'vs' : '';
+    const numbered = rep && rep.numberFrom != null;
+    const label = numbered
+      ? `<span class="row-num" data-ri="${ri}">P ${repNumber(project, rep, ri)}</span>${it.label ? `<span class="sub-label">${renderText(it.label, si, techs)}</span>` : ''}`
+      : `<span>${renderText(it.label || '', si, techs)}</span>`;
     return `
       <div class="row ${it.type === 'measure' ? 'measure' : ''} ${side} ${done ? 'done' : ''}" data-id="${it.id}" role="checkbox" aria-checked="${done}" tabindex="0">
         <span class="check">${checkIcon}</span>
         <span class="row-body">
-          ${it.label || it.side ? `<span class="row-label">${it.type === 'measure' ? rulerIcon : ''}<span>${renderText(it.label || '', si, techs)}</span>${sideChip(it.side)}</span>` : ''}
+          ${it.label || it.side || numbered ? `<span class="row-label">${it.type === 'measure' ? rulerIcon : ''}${label}${sideChip(it.side)}</span>` : ''}
           <span class="row-text">${renderText(it.text, si, techs)}</span>
         </span>
       </div>`;
@@ -541,8 +557,11 @@ function renderRecipe(body, project, techs) {
         <span class="rep-title">${repeatIcon}${esc(it.label || 'Gentages')}</span>
         <span class="rep-count"></span>
       </div>
-      ${it.items.filter((r) => applies(r, si)).map((r) =>
-        r.type === 'text' ? `<p class="note">${renderText(r.text, si, techs)}</p>` : rowHtml(r)).join('')}
+      ${(() => {
+        let ri = 0;
+        return it.items.filter((r) => applies(r, si)).map((r) =>
+          r.type === 'text' ? `<p class="note">${renderText(r.text, si, techs)}</p>` : rowHtml(r, it, ri++)).join('');
+      })()}
       <div class="rep-foot">
         <button class="rep-undo" aria-label="Én gentagelse tilbage">−</button>
         <button class="rep-new">Ny gentagelse ↻</button>
@@ -596,7 +615,7 @@ function renderRecipe(body, project, techs) {
       seg.classList.toggle('complete', secRows.length > 0 && d === secRows.length);
     });
     body.querySelector('#pc-now').innerHTML = pr.next
-      ? `Nu: <b>${esc(pat.sections[current].title)}</b> · ${esc(shortLabel(pr.next.label || 'næste pind'))}`
+      ? `Nu: <b>${esc(pat.sections[current].title)}</b> · ${esc(displayLabel(project, pr.next) || 'næste pind')}`
       : '<b>Alle pinde er strikket</b>';
     body.querySelectorAll('.sec').forEach((secEl) => {
       const secRows = pr.rows.filter((r) => r.sec === +secEl.dataset.sec);
@@ -616,6 +635,7 @@ function renderRecipe(body, project, techs) {
       el.classList.toggle('finished', !!finished);
       el.querySelector('.rep-new').classList.toggle('ready', allTicked && !finished);
       el.querySelector('.rep-undo').hidden = n === 0;
+      el.querySelectorAll('.row-num').forEach((num) => { num.textContent = `P ${repNumber(project, rep, +num.dataset.ri)}`; });
     });
     body.querySelectorAll('.row.current').forEach((r) => r.classList.remove('current'));
     if (pr.next) body.querySelector(`.row[data-id="${pr.next.id}"]`)?.classList.add('current');
