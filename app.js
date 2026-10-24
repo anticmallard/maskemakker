@@ -287,9 +287,14 @@ async function createProject(pattern) {
     done: {},
     have: {},
     reps: {},
+    secOpen: allSecs(pattern, false),   // MM-13: new projects start with every section folded
     started: false,
     created: Date.now(),
   });
+}
+
+function allSecs(pattern, open) {
+  return Object.fromEntries((pattern.sections || []).map((_, i) => [i, open]));
 }
 
 async function loadExample() {
@@ -371,7 +376,7 @@ async function renderHome() {
     return `
       <a class="card" href="#/p/${p.id}">
         <div class="card-pic ${photo ? '' : 'empty'}">
-          ${photo ? `<img src="${photo}" alt="">` : `<img class="knot-faded" src="icons/knot.png" alt=""><span class="add-pic">Tilføj billede</span>`}
+          ${photo ? `<img src="${photo}" alt="">` : `<img class="knot-faded" src="icons/knot.png" alt="">`}
           ${isFinished(p) ? '<span class="pct-badge">Færdig</span>' : isStarted(p) ? `<span class="pct-badge">${pr.pct}%</span>` : '<span class="new-badge">Ny</span>'}
         </div>
         <div class="card-body">
@@ -799,6 +804,7 @@ function renderRecipe(body, project, techs) {
       r.classList.toggle('locked', id !== rules.nextId && id !== rules.undoId);
     });
     body.querySelector('#next').hidden = !pr.next || isFinished(project);
+    updateNextBtn();
     // Keep the Opskrift tile in the header in step
     const sub = app.querySelector('.tile[href$="/opskrift"] .tile-sub');
     if (sub && isStarted(project) && !isFinished(project)) sub.textContent = `${pr.done} af ${pr.total} · ${pr.pct}%`;
@@ -892,7 +898,7 @@ function renderRecipe(body, project, techs) {
     const el = rid && body.querySelector(`.row[data-id="${rid}"]`);
     if (!el) return false;
     const secEl = el.closest('.sec');
-    if (secEl?.classList.contains('collapsed')) setSecOpen(secEl, true);
+    if (secEl?.classList.contains('collapsed')) setSecOpen(secEl, true, true);
     el.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'center' });
     el.classList.add('flash');
     setTimeout(() => el.classList.remove('flash'), 1200);
@@ -903,6 +909,24 @@ function renderRecipe(body, project, techs) {
     secEl.classList.toggle('collapsed', !open);
     secEl.querySelector('.sec-toggle').setAttribute('aria-expanded', open);
     if (save) { project.secOpen[secEl.dataset.sec] = open; store.saveProject(project); }
+    updateNextBtn();
+  }
+
+  // MM-8: the "next row" button hides while the next row is on screen,
+  // and points up when you have scrolled past it.
+  function updateNextBtn() {
+    const btn = body.querySelector('#next');
+    if (!btn || btn.hidden) return;
+    const pr = progress(project);
+    const rowEl = pr.next && body.querySelector(`.row[data-id="${pr.next.id}"]`);
+    if (!rowEl) return;
+    const secEl = rowEl.closest('.sec');
+    const folded = secEl?.classList.contains('collapsed');
+    const r = (folded ? secEl : rowEl).getBoundingClientRect();
+    const above = r.bottom < 0;
+    const below = r.top > window.innerHeight - 80;   // room for the button itself
+    btn.classList.toggle('away', !folded && !above && !below);
+    btn.textContent = above ? 'Gå til næste pind ↑' : below ? 'Gå til næste pind ↓' : 'Vis næste pind';
   }
 
   body.querySelector('#next').onclick = () => scrollToRow(progress(project).next?.id, true);
@@ -914,6 +938,7 @@ function renderRecipe(body, project, techs) {
     const now = Date.now();
     project.finished = true;
     project.finishedAt = now;
+    project.secOpen = allSecs(project.pattern, false);   // MM-10: fold the whole recipe
     await store.saveProject(project);
     openSheet('Tillykke – projektet er færdigt! 🧶', [
       { label: 'Tilføj billede af dit strik', action: () => { pickPhoto(project); go('#/'); } },
@@ -954,7 +979,11 @@ function renderRecipe(body, project, techs) {
   });
 
   // Remember the scroll position while you're in the recipe
-  window.__recipeScroll = () => { recipeScroll[project.id] = window.scrollY; };
+  let nextTick = 0;
+  window.__recipeScroll = () => {
+    recipeScroll[project.id] = window.scrollY;
+    if (!nextTick) nextTick = requestAnimationFrame(() => { nextTick = 0; updateNextBtn(); });
+  };
   window.addEventListener('scroll', window.__recipeScroll, { passive: true });
 }
 
