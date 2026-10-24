@@ -50,7 +50,8 @@ Menu (•••) on the home screen → **Gem backup af alle projekter**. Save t
   "sizes": ["S", "M", "L"],
   "sizeDetails": ["86 cm", "94 cm", "102 cm"],
   "sizeDetailLabel": "Brystvidde",
-  "materials": [{ "text": "{3|4|5} nøgler Sunday" }, { "text": "Rundpind 3 mm" }],
+  "yarn": [{ "name": "Sunday fra Sandnes Garn", "text": "{3|4|5} nøgler (50 g = 235 m)" }],
+  "needles": [{ "text": "Rundpind 3 mm, 60 cm", "size": "3 mm" }],
   "gauge": [{ "label": "Glatstrik", "text": "28 m = 10 cm" }],
   "techniques": [
     { "id": "udt", "name": "Udt", "text": "How it's done", "video": "https://…" }
@@ -77,7 +78,8 @@ Menu (•••) on the home screen → **Gem backup af alle projekter**. Save t
 
 - `{10|12|14}` — one number per size, in the same order as `sizes`. Use `-` where a size has no value.
 - `sizeDetails` — what each size means (shown on the size buttons under Materialer).
-- `materials` — the yarn and needle checklist under Materialer.
+- `yarn` — one entry per yarn the pattern suggests. With more than one, you pick yours from a list under Materialer.
+- `needles` — the pattern's needles. Under Materialer you can record that you use another size ("Du bruger: 3,5 mm"); the pattern's needle stays visible and the recipe doesn't change.
 - `techniques` + `[[udt]]` in a row — the word becomes tappable and opens the Teknikker tab. `[[indt-r|Indt-r]]` shows different text than the id.
 - `side`: `"RS"` (retside, mustard) or `"VS"` (vrangside, lilac). Leave it out for rounds.
 - `[Se video](https://…)` — a live link. `**text**` — bold.

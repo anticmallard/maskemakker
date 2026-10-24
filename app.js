@@ -82,12 +82,18 @@ const repsOf = (project, rep) => project.reps?.[rep.id] || 0;
  * Running P number for a row in a numbered repeat block ("numberFrom"): the numbers keep
  * counting with each repeat, e.g. P 16–23 in the first, P 24–31 in the second.
  */
+/** A number that may differ per size, e.g. "{22|27}" → 22 or 27. */
+const sizedInt = (v, si) => (v == null ? null : parseInt(plain(String(v), si), 10));
+const blockRowsOf = (rep, si) => rep.items.filter((r) => isRow(r) && applies(r, si));
+/** How many times a repeat block is knitted, when the pattern says so ("times"); else null. */
+const repTimes = (rep, si) => sizedInt(rep.times, si);
+
 const repNumber = (project, rep, ri) =>
-  rep.numberFrom + repsOf(project, rep) * rep.items.filter((r) => isRow(r) && applies(r, project.sizeIndex)).length + ri;
+  sizedInt(rep.numberFrom, project.sizeIndex) + repsOf(project, rep) * blockRowsOf(rep, project.sizeIndex).length + ri;
 
 /** The short label shown for a row outside the recipe list (home card, progress card, back button). */
 const displayLabel = (project, r) =>
-  r.repeat && r.repeat.numberFrom != null ? `P ${repNumber(project, r.repeat, r.ri)}` : shortLabel(r.label || '');
+  r.repeat && r.repeat.numberFrom != null ? `P ${repNumber(project, r.repeat, r.ri)}` : shortLabel(r.label || '', project.sizeIndex);
 
 /**
  * Is this row done? Rows in a repeat block are cleared at each "Ny gentagelse", so for the
@@ -95,6 +101,15 @@ const displayLabel = (project, r) =>
  * count when actually ticked (or the repeats are finished).
  */
 function rowDone(project, r, forProgress) {
+  const t = r.repeat ? repTimes(r.repeat, project.sizeIndex) : null;
+  if (t) {
+    // Fixed number of repeats: while more repeats remain and the block is all ticked,
+    // the "next row" is the block's first row (where "Ny gentagelse" sits).
+    if (!project.done[r.id]) return false;
+    const n = repsOf(project, r.repeat);
+    const all = blockRowsOf(r.repeat, project.sizeIndex).every((x) => project.done[x.id]);
+    return !(r.ri === 0 && all && n < t - 1 && !forProgress);
+  }
   if (project.done[r.id]) return true;
   if (r.repeat) {
     if (r.repeat.until && project.done[r.repeat.until.id]) return true;
@@ -103,20 +118,33 @@ function rowDone(project, r, forProgress) {
   return false;
 }
 
+/**
+ * How much a row counts towards progress: a row in a block knitted a fixed number of times
+ * counts once per repeat (8 rows × 22 repeats = 176 rows); everything else counts once.
+ */
+function rowStats(project, r) {
+  const t = r.repeat ? repTimes(r.repeat, project.sizeIndex) : null;
+  if (t) return { w: t, d: Math.min(repsOf(project, r.repeat) + (project.done[r.id] ? 1 : 0), t) };
+  return { w: 1, d: rowDone(project, r, true) ? 1 : 0 };
+}
+
 function progress(project) {
   const rows = visibleRows(project);
-  const done = rows.filter((r) => rowDone(project, r, true)).length;
+  let done = 0, total = 0;
+  for (const r of rows) { const st = rowStats(project, r); done += st.d; total += st.w; }
   const next = rows.find((r) => !rowDone(project, r, false));
-  return { rows, done, total: rows.length, pct: rows.length ? Math.round((done / rows.length) * 100) : 0, next };
+  return { rows, done, total, pct: total ? Math.round((done / total) * 100) : 0, next };
 }
 
 const isStarted = (p) => !!p.started;
-const isFinished = (p) => { const pr = progress(p); return pr.total > 0 && pr.done === pr.total; };
+/** A project is finished when you tap "Jeg er færdig!" at the bottom of the recipe. */
+const isFinished = (p) => !!p.finished;
+const isFinishedFlag = isFinished;
 const photoOf = (p) => p.photo || p.pattern.photo || null;
 
 /** Techniques as a map by id. */
 const techMap = (pattern) => Object.fromEntries((pattern.techniques || []).map((t) => [t.id, t]));
-const shortLabel = (l) => plain(l).split('·')[0].trim();
+const shortLabel = (l, si) => plain(l, si).split('·')[0].trim();
 
 /** Where each technique is used, e.g. "Udtagninger P 1, P 5 · Baghoved Omg 3". */
 function techUsage(pattern, si) {
@@ -130,7 +158,7 @@ function techUsage(pattern, si) {
         const id = m[1].trim();
         const bySec = (usage[id] ||= new Map());
         if (!bySec.has(sec.title)) bySec.set(sec.title, []);
-        const lbl = it.label ? shortLabel(it.label) : '';
+        const lbl = it.label ? shortLabel(it.label, si) : '';
         if (lbl && !bySec.get(sec.title).includes(lbl)) bySec.get(sec.title).push(lbl);
       }
     };
@@ -323,7 +351,7 @@ async function renderHome() {
       <a class="card" href="#/p/${p.id}">
         <div class="card-pic ${photo ? '' : 'empty'}">
           ${photo ? `<img src="${photo}" alt="">` : `<img class="knot-faded" src="icons/knot.png" alt=""><span class="add-pic">Tilføj billede</span>`}
-          ${isStarted(p) ? `<span class="pct-badge">${pr.pct}%</span>` : '<span class="new-badge">Ny</span>'}
+          ${isFinished(p) ? '<span class="pct-badge">Færdig</span>' : isStarted(p) ? `<span class="pct-badge">${pr.pct}%</span>` : '<span class="new-badge">Ny</span>'}
         </div>
         <div class="card-body">
           <div class="card-title">${esc(p.pattern.title)}</div>
@@ -358,7 +386,7 @@ async function renderHome() {
   app.querySelector('#import').onclick = pickFile;
   app.querySelector('#example')?.addEventListener('click', loadExample);
   app.querySelector('#home-menu').onclick = () => openSheet('Maskemakker', [
-    { label: 'Importér opskrift eller backup', action: pickFile },
+    { label: 'Importér opskrift', action: pickFile },
     { label: 'Gem backup af alle projekter', action: exportBackup },
     { label: 'Tilføj eksempelopskrift', action: loadExample },
   ]);
@@ -371,6 +399,7 @@ const recipeScroll = {};
 let focusTech = null;   // technique tapped in the recipe
 let fromRow = null;     // the row it was tapped from
 let returnTo = null;    // row to scroll to when coming back from Teknikker
+let scrollToFinish = false; // finished project opened from home → show the finish block
 
 async function renderProject(id, tab) {
   const project = await store.getProject(id);
@@ -379,7 +408,10 @@ async function renderProject(id, tab) {
   if (project.started === undefined) project.started = project.sizeIndex != null;
   project.have = project.have || {};
 
-  if (!TABS.includes(tab)) tab = isStarted(project) && project.sizeIndex != null ? 'opskrift' : 'materialer';
+  if (!TABS.includes(tab)) {
+    if (isFinished(project)) { tab = 'opskrift'; scrollToFinish = true; }
+    else tab = isStarted(project) && project.sizeIndex != null ? 'opskrift' : 'materialer';
+  }
 
   const pat = project.pattern;
   const si = project.sizeIndex;
@@ -403,8 +435,8 @@ async function renderProject(id, tab) {
       </div>
       <nav class="tiles">
         ${tile('materialer', 'Materialer', yarnIcon, si == null ? 'Ikke valgt' : esc(pat.sizes[si]))}
+        ${tile('opskrift', 'Opskrift', listIcon, isFinishedFlag(project) ? 'Færdig' : !isStarted(project) ? 'Ikke startet' : `${pr.done} af ${pr.total} · ${pr.pct}%`)}
         ${tile('teknikker', 'Teknikker', bookIcon, nTech ? `${nTech} i opskriften` : 'Ingen')}
-        ${tile('opskrift', 'Opskrift', listIcon, !isStarted(project) ? 'Ikke startet' : `${pr.done} af ${pr.total} · ${pr.pct}%`)}
       </nav>
     </header>
     <main class="proj" id="tab-body"></main>`;
@@ -432,11 +464,45 @@ function renderMaterials(body, project) {
       <b>${esc(s)}</b>${details[i] ? `<span>${esc(details[i])}</span>` : ''}
     </button>`).join('');
 
-  const materials = (pat.materials || []).map((m, i) => `
-    <label class="check-row">
-      <input type="checkbox" data-have="${i}" ${project.have[i] ? 'checked' : ''}>
-      <span>${renderText(m.text, si)}</span>
-    </label>`).join('');
+  // Older pattern files: one plain list
+  const materials = !pat.yarn && !pat.needles ? (pat.materials || []).map((m) => `
+    <div class="list-row">${renderText(m.text, si)}</div>`).join('') : '';
+
+  // Yarn: when the pattern suggests several, you pick the one you use
+  const yarnOpts = pat.yarn || [];
+  const yarnHtml = yarnOpts.length > 1 ? `
+    <p class="hint top">Opskriften foreslår ${yarnOpts.length} garner. Vælg det, du bruger.</p>
+    <div class="choice-list" role="radiogroup">
+      ${yarnOpts.map((y, i) => `
+        <button class="choice ${project.yarnChoice === i ? 'on' : ''}" data-yarn="${i}" role="radio" aria-checked="${project.yarnChoice === i}">
+          <span class="radio"></span>
+          <span class="choice-body"><b>${esc(y.name)}</b>${y.text ? `<span>${renderText(y.text, si)}</span>` : ''}</span>
+        </button>`).join('')}
+    </div>` : yarnOpts.length === 1 ? `
+    <div class="panel"><div class="list-row"><b>${esc(yarnOpts[0].name)}</b>${yarnOpts[0].text ? `<br>${renderText(yarnOpts[0].text, si)}` : ''}</div></div>` : '';
+
+  // Needles: the pattern's needle stays visible; you can record that you use another size
+  project.needles = project.needles || {};
+  const sizeChoices = ['2 mm', '2,25 mm', '2,5 mm', '2,75 mm', '3 mm', '3,25 mm', '3,5 mm', '3,75 mm', '4 mm', '4,5 mm', '5 mm', '5,5 mm', '6 mm', '6,5 mm', '7 mm', '8 mm', '9 mm', '10 mm', '12 mm'];
+  const needleHtml = (pat.needles || []).map((n, i) => {
+    const mine = project.needles[i];
+    return `
+      <div class="needle-row ${mine ? 'changed' : ''}">
+        <div class="needle-text">
+          ${mine ? `<span class="needle-label">Opskriften</span>` : ''}
+          <span class="${mine ? 'needle-orig' : ''}">${renderText(n.text, si)}</span>
+          ${mine ? `<span class="needle-mine">Du bruger: <b>${esc(mine)}</b></span>` : ''}
+        </div>
+        <label class="needle-pick">
+          <span class="sr-only">Pindestørrelse du bruger</span>
+          <select data-needle="${i}">
+            <option value="">${mine ? 'Som opskriften' : 'Anden pind?'}</option>
+            ${sizeChoices.map((sz) => `<option ${sz === mine ? 'selected' : ''}>${sz}</option>`).join('')}
+          </select>
+        </label>
+      </div>`;
+  }).join('');
+  const anyNeedleChanged = Object.keys(project.needles).length > 0;
 
   const gauge = (pat.gauge || []).map((g) => `
     <div class="gauge-cell"><span>${esc(g.label)}</span><b>${renderText(g.text, si)}</b></div>`).join('');
@@ -460,7 +526,11 @@ function renderMaterials(body, project) {
         <div class="size-grid">${sizeBtns}</div>
         ${hint ? `<p class="hint">${hint}</p>` : ''}` : ''}
       ${materials ? `<h3 class="block-title">Garn og pinde</h3><div class="panel">${materials}</div>` : ''}
+      ${yarnHtml ? `<h3 class="block-title">Garn</h3>${yarnHtml}` : ''}
+      ${needleHtml ? `<h3 class="block-title">Pinde</h3><div class="panel">${needleHtml}</div>
+        ${anyNeedleChanged ? '<p class="hint">Opskriften ændrer sig ikke, når du bruger en anden pind. Tjek gerne strikkefastheden.</p>' : ''}` : ''}
       ${gauge ? `<h3 class="block-title">Strikkefasthed</h3><div class="panel gauge">${gauge}</div>` : ''}
+      ${(pat.tips || []).length ? `<h3 class="block-title">Tips</h3>${pat.tips.map((t) => `<div class="panel tip">${t.title ? `<b>${esc(t.title)}</b>` : ''}<p>${renderText(t.text, si)}</p></div>`).join('')}` : ''}
       ${info ? `<h3 class="block-title">Garn, pinde og strikkefasthed</h3><dl class="panel info">${info}</dl>` : ''}
       ${pat.intro ? `<h3 class="block-title">Om opskriften</h3><p class="intro">${pat.designer ? `<span class="designer">${esc(pat.designer)}</span><br>` : ''}${renderText(pat.intro, si)}</p>` : ''}
       <div class="end-space"></div>
@@ -477,6 +547,24 @@ function renderMaterials(body, project) {
   body.querySelectorAll('[data-have]').forEach((c) => c.onchange = async () => {
     if (c.checked) project.have[c.dataset.have] = true; else delete project.have[c.dataset.have];
     await store.saveProject(project);
+  });
+  body.querySelectorAll('[data-yarn]').forEach((b) => b.onclick = async () => {
+    const i = +b.dataset.yarn;
+    project.yarnChoice = project.yarnChoice === i ? undefined : i;   // tap again to unselect
+    const y = window.scrollY;
+    await store.saveProject(project);
+    await renderProject(project.id, 'materialer');
+    window.scrollTo(0, y);
+  });
+  body.querySelectorAll('[data-needle]').forEach((sel) => sel.onchange = async () => {
+    const i = sel.dataset.needle;
+    const orig = plain((pat.needles[i] || {}).size || '', si);
+    if (!sel.value || sel.value === orig) delete project.needles[i];
+    else project.needles[i] = sel.value;
+    const y = window.scrollY;
+    await store.saveProject(project);
+    await renderProject(project.id, 'materialer');
+    window.scrollTo(0, y);
   });
   body.querySelector('#start')?.addEventListener('click', async () => {
     project.started = true;
@@ -539,8 +627,8 @@ function renderRecipe(body, project, techs) {
     const side = it.side === 'RS' ? 'rs' : it.side === 'VS' ? 'vs' : '';
     const numbered = rep && rep.numberFrom != null;
     const label = numbered
-      ? `<span class="row-num" data-ri="${ri}">P ${repNumber(project, rep, ri)}</span>${it.label ? `<span class="sub-label">${renderText(it.label, si, techs)}</span>` : ''}`
-      : `<span>${renderText(it.label || '', si, techs)}</span>`;
+      ? `<span class="row-num" data-ri="${ri}">P ${repNumber(project, rep, ri)}</span>${it.label ? `<span class="sub-label">${esc(plain(it.label, si))}</span>` : ''}`
+      : `<span>${esc(plain(it.label || '', si))}</span>`;
     return `
       <div class="row ${it.type === 'measure' ? 'measure' : ''} ${side} ${done ? 'done' : ''}" data-id="${it.id}" role="checkbox" aria-checked="${done}" tabindex="0">
         <span class="check">${checkIcon}</span>
@@ -565,6 +653,7 @@ function renderRecipe(body, project, techs) {
       <div class="rep-foot">
         <button class="rep-undo" aria-label="Én gentagelse tilbage">−</button>
         <button class="rep-new">Ny gentagelse ↻</button>
+        <span class="rep-last">Sidste gentagelse</span>
       </div>
     </div>
     ${it.until ? rowHtml(it.until) : ''}`;
@@ -594,6 +683,15 @@ function renderRecipe(body, project, techs) {
         <div class="pc-now" id="pc-now"></div>
       </div>
       ${sections}
+      <div class="finish">
+        ${isFinished(project)
+          ? `<p class="finish-done">${knotImg}Færdig${project.finishedAt ? ` ${new Date(project.finishedAt).toLocaleDateString('da-DK', { day: 'numeric', month: 'long', year: 'numeric' })}` : ''}</p>
+             ${project.photo ? `<img class="finish-photo" src="${project.photo}" alt="Dit færdige strik">` : ''}
+             <button class="pill" id="finish-photo">${project.photo ? 'Skift billede af dit strik' : '＋ Tilføj billede af dit strik'}</button>
+             <button class="primary brand finish-btn" id="again">Strik denne opskrift igen</button>
+             <button class="link-btn" id="unfinish">Markér som i gang igen</button>`
+          : `<button class="primary brand finish-btn" id="finish">Jeg er færdig!</button>`}
+      </div>
       <div class="end-space"></div>
     </div>
     <button class="next-btn" id="next">Gå til næste pind ↓</button>`;
@@ -604,45 +702,49 @@ function renderRecipe(body, project, techs) {
 
   const updateCounts = () => {
     const pr = progress(project);
+    const secStats = (secIdx) => pr.rows.filter((r) => r.sec === secIdx)
+      .reduce((a, r) => { const st = rowStats(project, r); return { w: a.w + st.w, d: a.d + st.d }; }, { w: 0, d: 0 });
     body.querySelector('#pc-pct').textContent = `${pr.pct}% strikket`;
     body.querySelector('#pc-count').textContent = `${pr.done} af ${pr.total} pinde`;
     const current = pr.next?.sec;
     body.querySelectorAll('.seg').forEach((seg) => {
-      const secRows = pr.rows.filter((r) => r.sec === +seg.dataset.seg);
-      const d = secRows.filter((r) => rowDone(project, r, true)).length;
-      seg.style.flexGrow = Math.max(secRows.length, 1);
-      seg.firstElementChild.style.width = secRows.length ? `${(d / secRows.length) * 100}%` : '0';
-      seg.classList.toggle('complete', secRows.length > 0 && d === secRows.length);
+      const st = secStats(+seg.dataset.seg);
+      seg.style.flexGrow = Math.max(st.w, 1);
+      seg.firstElementChild.style.width = st.w ? `${(st.d / st.w) * 100}%` : '0';
+      seg.classList.toggle('complete', st.w > 0 && st.d === st.w);
     });
     body.querySelector('#pc-now').innerHTML = pr.next
       ? `Nu: <b>${esc(pat.sections[current].title)}</b> · ${esc(displayLabel(project, pr.next) || 'næste pind')}`
       : '<b>Alle pinde er strikket</b>';
     body.querySelectorAll('.sec').forEach((secEl) => {
-      const secRows = pr.rows.filter((r) => r.sec === +secEl.dataset.sec);
-      const d = secRows.filter((r) => rowDone(project, r, true)).length;
-      secEl.querySelector('.sec-count').textContent = secRows.length ? `${d}/${secRows.length}` : '';
-      secEl.classList.toggle('complete', secRows.length > 0 && d === secRows.length);
+      const st = secStats(+secEl.dataset.sec);
+      secEl.querySelector('.sec-count').textContent = st.w ? `${st.d}/${st.w}` : '';
+      secEl.classList.toggle('complete', st.w > 0 && st.d === st.w);
     });
     body.querySelectorAll('.repeat').forEach((el) => {
       const rep = repeats[el.dataset.rep];
       const n = repsOf(project, rep);
-      const finished = rep.until && project.done[rep.until.id];
+      const t = repTimes(rep, si);
       const allTicked = blockRows(rep).every((r) => project.done[r.id]);
+      const lastRound = t != null && n >= t - 1;
+      const finished = t != null ? lastRound && allTicked : rep.until && project.done[rep.until.id];
       const total = n + (allTicked ? 1 : 0);
       el.querySelector('.rep-count').textContent = finished
         ? `Færdig · ${total} ${total === 1 ? 'gentagelse' : 'gentagelser'}`
-        : `Gentagelse ${n + 1}`;
+        : t != null ? `Gentagelse ${n + 1} af ${t}` : `Gentagelse ${n + 1}`;
       el.classList.toggle('finished', !!finished);
+      el.querySelector('.rep-new').hidden = lastRound;
+      el.querySelector('.rep-last').hidden = !lastRound || finished;
       el.querySelector('.rep-new').classList.toggle('ready', allTicked && !finished);
       el.querySelector('.rep-undo').hidden = n === 0;
       el.querySelectorAll('.row-num').forEach((num) => { num.textContent = `P ${repNumber(project, rep, +num.dataset.ri)}`; });
     });
     body.querySelectorAll('.row.current').forEach((r) => r.classList.remove('current'));
     if (pr.next) body.querySelector(`.row[data-id="${pr.next.id}"]`)?.classList.add('current');
-    body.querySelector('#next').hidden = !pr.next;
+    body.querySelector('#next').hidden = !pr.next || isFinished(project);
     // Keep the Opskrift tile in the header in step
     const sub = app.querySelector('.tile[href$="/opskrift"] .tile-sub');
-    if (sub && isStarted(project)) sub.textContent = `${pr.done} af ${pr.total} · ${pr.pct}%`;
+    if (sub && isStarted(project) && !isFinished(project)) sub.textContent = `${pr.done} af ${pr.total} · ${pr.pct}%`;
   };
   updateCounts();
 
@@ -656,12 +758,14 @@ function renderRecipe(body, project, techs) {
     updateCounts();
     await store.saveProject(project);
     const pr = progress(project);
-    if (pr.total && pr.done === pr.total && project.done[rid]) toast('Færdig! 🧶');
+    if (pr.total && pr.done === pr.total && project.done[rid] && !isFinished(project)) toast('Alle pinde er strikket! Tryk "Jeg er færdig!" nederst.', 3500);
   };
 
   const newRepeat = async (el) => {
     const rep = repeats[el.dataset.rep];
     const rows = blockRows(rep);
+    const t = repTimes(rep, si);
+    if (t != null && repsOf(project, rep) >= t - 1) return;
     if (!rows.every((r) => project.done[r.id]) &&
         !(await ask('Ikke alle pinde i gentagelsen er krydset af.', 'Start ny gentagelse alligevel'))) return;
     project.reps = project.reps || {};
@@ -714,10 +818,46 @@ function renderRecipe(body, project, techs) {
 
   body.querySelector('#next').onclick = () => scrollToRow(progress(project).next?.id, true);
 
+  body.querySelector('#finish')?.addEventListener('click', async () => {
+    const pr = progress(project);
+    const left = pr.total - pr.done;
+    if (left > 0 && !(await ask(`Der er ${left} ${left === 1 ? 'pind' : 'pinde'} uden flueben. Er projektet færdigt alligevel?`, 'Ja, jeg er færdig'))) return;
+    const now = Date.now();
+    project.finished = true;
+    project.finishedAt = now;
+    await store.saveProject(project);
+    openSheet('Tillykke – projektet er færdigt! 🧶', [
+      { label: 'Tilføj billede af dit strik', action: () => { pickPhoto(project); go('#/'); } },
+    ], () => go('#/'));
+  });
+  body.querySelector('#finish-photo')?.addEventListener('click', () => pickPhoto(project));
+  body.querySelector('#again')?.addEventListener('click', async () => {
+    // New project with the same pattern; the finished one stays under "Færdige".
+    const copy = await createProject(normalizePattern(JSON.parse(JSON.stringify(project.pattern))));
+    toast('Nyt projekt startet');
+    go(`#/p/${copy.id}`);
+  });
+  body.querySelector('#unfinish')?.addEventListener('click', async () => {
+    project.finished = false;
+    delete project.finishedAt;
+    if (project.autoDone) {                        // untick the rows "Jeg er færdig!" ticked
+      for (const id of project.autoDone.rows) delete project.done[id];
+      project.reps = project.autoDone.reps;
+      delete project.autoDone;
+    }
+    await store.saveProject(project);
+    renderProject(project.id, 'opskrift');
+  });
+
   // Coming back: to the row you left from, else where you were, else the next row.
   requestAnimationFrame(() => {
     const target = returnTo;
     returnTo = null;
+    if (scrollToFinish) {
+      scrollToFinish = false;
+      body.querySelector('.finish')?.scrollIntoView({ block: 'end' });
+      return;
+    }
     if (target && scrollToRow(target, false)) return;
     if (recipeScroll[project.id] != null) { window.scrollTo(0, recipeScroll[project.id]); return; }
     const next = progress(project).next;
@@ -747,6 +887,8 @@ function projectMenu(project, tab) {
         if (!(await ask('Fjern alle flueben i dette projekt?', 'Nulstil fremskridt', true))) return;
         project.done = {};
         project.reps = {};
+        project.finished = false;
+        delete project.autoDone;
         await store.saveProject(project);
         renderProject(project.id, tab);
       },
@@ -797,6 +939,7 @@ window.addEventListener('hashchange', route);
 
 /* ---------- icons ---------- */
 
+const knotImg = '<img class="finish-knot" src="icons/knot.png" alt="">';
 const playIcon = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3v10l8-5z" fill="currentColor"/></svg>';
 const dotsIcon = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>';
 const backIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>';
