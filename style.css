@@ -308,10 +308,17 @@ a { color: inherit; }
 .pc-now b { color: var(--plum); }
 
 .sec { margin-bottom: 22px; }
-.sec-head {
-  display: flex; justify-content: space-between; align-items: baseline;
-  font: 600 21px var(--serif); margin: 0 4px 8px;
+.sec-head { margin: 0 0 8px; }
+.sec-toggle {
+  width: 100%; display: flex; align-items: center; gap: 8px; padding: 6px 4px; text-align: left;
+  font: 600 21px var(--serif); color: var(--ink);
 }
+.sec-title { flex: 1; min-width: 0; }
+.chev { width: 20px; height: 20px; flex: none; color: var(--muted); transition: transform .2s; }
+.sec.collapsed .chev { transform: rotate(-90deg); }
+.sec.collapsed .sec-body { display: none; }
+.sec.collapsed { margin-bottom: 6px; }
+.sec.collapsed .sec-toggle { background: var(--surface); border-radius: 14px; padding: 12px 14px; box-shadow: var(--shadow); }
 .sec-count { font: 500 14px var(--sans); color: var(--muted); font-variant-numeric: tabular-nums; }
 .sec.complete .sec-count { color: var(--done); }
 .sec.complete .sec-count::before { content: "✓ "; }
@@ -343,6 +350,11 @@ a { color: inherit; }
 .sub-label { font-size: 12px; font-weight: 600; color: var(--muted); }
 .ruler { width: 18px; height: 18px; color: var(--muted); }
 
+.marks { display: contents; }
+.mark {
+  display: inline-flex; align-items: center; font-size: 12px; font-weight: 700; text-decoration: none;
+  padding: 2px 8px; border-radius: 99px; background: var(--plum); color: var(--on-plum);
+}
 .side {
   display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700;
   padding: 2px 8px; border-radius: 99px; color: #182511;
@@ -437,3 +449,9 @@ a { color: inherit; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }
+.mark.term { color: var(--on-plum); text-decoration: none; }
+
+/* Rows you can't tick yet */
+.row.locked:not(.done) .check { border-style: dashed; opacity: .5; }
+.row.locked { cursor: default; }
+.rep-new.flash { animation: flash 1.2s; }

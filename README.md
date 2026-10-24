@@ -78,6 +78,9 @@ Menu (•••) on the home screen → **Gem backup af alle projekter**. Save t
 
 - `{10|12|14}` — one number per size, in the same order as `sizes`. Use `-` where a size has no value.
 - `sizeDetails` — what each size means (shown on the size buttons under Materialer).
+- `notions` — other things you need, e.g. buttons (shown under "Tilbehør").
+- `rowMarks` — rows the app marks automatically, e.g. buttonholes: `{ "label": "Knaphul", "tech": "knaphul", "first": 4, "every": "{24|26}", "count": "{8|8}" }` marks P 4, P 28, P 52 … Works inside repeat blocks too.
+- `"numberPrefix": "Omg"` on a `repeat` — count rounds instead of rows (Omg 1, Omg 2 …).
 - `yarn` — one entry per yarn the pattern suggests. With more than one, you pick yours from a list under Materialer.
 - `needles` — the pattern's needles. Under Materialer you can record that you use another size ("Du bruger: 3,5 mm"); the pattern's needle stays visible and the recipe doesn't change.
 - `techniques` + `[[udt]]` in a row — the word becomes tappable and opens the Teknikker tab. `[[indt-r|Indt-r]]` shows different text than the id.

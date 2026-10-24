@@ -92,8 +92,29 @@ const repNumber = (project, rep, ri) =>
   sizedInt(rep.numberFrom, project.sizeIndex) + repsOf(project, rep) * blockRowsOf(rep, project.sizeIndex).length + ri;
 
 /** The short label shown for a row outside the recipe list (home card, progress card, back button). */
+const repPrefix = (rep) => rep.numberPrefix || 'P';
 const displayLabel = (project, r) =>
-  r.repeat && r.repeat.numberFrom != null ? `P ${repNumber(project, r.repeat, r.ri)}` : shortLabel(r.label || '', project.sizeIndex);
+  r.repeat && r.repeat.numberFrom != null ? `${repPrefix(r.repeat)} ${repNumber(project, r.repeat, r.ri)}` : shortLabel(r.label || '', project.sizeIndex);
+
+/**
+ * Row marks, e.g. buttonholes: { label: "Knaphul", tech: "knaphul", first: 4, every: "{24|26}", count: "{8|8}" }
+ * marks P 4, P 28, P 52 … (8 in total). Only rows numbered "P n" are checked.
+ */
+function marksFor(pattern, si, n) {
+  if (n == null) return [];
+  return (pattern.rowMarks || []).filter((m) => {
+    const first = sizedInt(m.first, si), every = sizedInt(m.every, si), count = sizedInt(m.count, si);
+    if (n < first) return false;
+    const k = (n - first) / every;
+    return Number.isInteger(k) && (count == null || k < count);
+  });
+}
+/** The P number of a row, if it has one. */
+function rowNumber(project, r, rep, ri) {
+  if (rep && rep.numberFrom != null) return repPrefix(rep) === 'P' ? repNumber(project, rep, ri) : null;
+  const m = plain(r.label || '', project.sizeIndex).match(/^P (\d+)$/);
+  return m ? +m[1] : null;
+}
 
 /**
  * Is this row done? Rows in a repeat block are cleared at each "Ny gentagelse", so for the
@@ -527,6 +548,7 @@ function renderMaterials(body, project) {
         ${hint ? `<p class="hint">${hint}</p>` : ''}` : ''}
       ${materials ? `<h3 class="block-title">Garn og pinde</h3><div class="panel">${materials}</div>` : ''}
       ${yarnHtml ? `<h3 class="block-title">Garn</h3>${yarnHtml}` : ''}
+      ${(pat.notions || []).length ? `<h3 class="block-title">Tilbehør</h3><div class="panel">${pat.notions.map((n) => `<div class="list-row">${renderText(n.text, si)}</div>`).join('')}</div>` : ''}
       ${needleHtml ? `<h3 class="block-title">Pinde</h3><div class="panel">${needleHtml}</div>
         ${anyNeedleChanged ? '<p class="hint">Opskriften ændrer sig ikke, når du bruger en anden pind. Tjek gerne strikkefastheden.</p>' : ''}` : ''}
       ${gauge ? `<h3 class="block-title">Strikkefasthed</h3><div class="panel gauge">${gauge}</div>` : ''}
@@ -622,18 +644,30 @@ function renderRecipe(body, project, techs) {
     ? `<span class="side rs">${knitIcon}Retside</span>`
     : side === 'VS' ? `<span class="side vs">${purlIcon}Vrangside</span>` : '';
 
+  project.secOpen = project.secOpen || {};
+  const secDone = (secIdx) => {
+    const rows = visibleRows(project).filter((r) => r.sec === secIdx);
+    return rows.length > 0 && rows.every((r) => rowStats(project, r).d === rowStats(project, r).w);
+  };
+  const secCollapsed = (secIdx) => (secIdx in project.secOpen ? !project.secOpen[secIdx] : secDone(secIdx));
+
+  const marksHtml = (n) => marksFor(pat, si, n).map((m) => m.tech && techs[m.tech]
+    ? `<a class="mark term" href="#tech" data-tech="${esc(m.tech)}">${esc(m.label)}</a>`
+    : `<span class="mark">${esc(m.label)}</span>`).join('');
+
   const rowHtml = (it, rep, ri) => {
     const done = !!project.done[it.id];
     const side = it.side === 'RS' ? 'rs' : it.side === 'VS' ? 'vs' : '';
     const numbered = rep && rep.numberFrom != null;
+    const marks = marksHtml(rowNumber(project, it, rep, ri));
     const label = numbered
-      ? `<span class="row-num" data-ri="${ri}">P ${repNumber(project, rep, ri)}</span>${it.label ? `<span class="sub-label">${esc(plain(it.label, si))}</span>` : ''}`
+      ? `<span class="row-num" data-ri="${ri}">${repPrefix(rep)} ${repNumber(project, rep, ri)}</span>${it.label ? `<span class="sub-label">${esc(plain(it.label, si))}</span>` : ''}`
       : `<span>${esc(plain(it.label || '', si))}</span>`;
     return `
       <div class="row ${it.type === 'measure' ? 'measure' : ''} ${side} ${done ? 'done' : ''}" data-id="${it.id}" role="checkbox" aria-checked="${done}" tabindex="0">
         <span class="check">${checkIcon}</span>
         <span class="row-body">
-          ${it.label || it.side || numbered ? `<span class="row-label">${it.type === 'measure' ? rulerIcon : ''}${label}${sideChip(it.side)}</span>` : ''}
+          ${it.label || it.side || numbered ? `<span class="row-label">${it.type === 'measure' ? rulerIcon : ''}${label}${sideChip(it.side)}<span class="marks">${marks}</span></span>` : ''}
           <span class="row-text">${renderText(it.text, si, techs)}</span>
         </span>
       </div>`;
@@ -642,7 +676,7 @@ function renderRecipe(body, project, techs) {
   const repeatHtml = (it) => `
     <div class="repeat" data-rep="${it.id}">
       <div class="rep-head">
-        <span class="rep-title">${repeatIcon}${esc(it.label || 'Gentages')}</span>
+        <span class="rep-title">${repeatIcon}${esc(plain(it.label || 'Gentages', si))}</span>
         <span class="rep-count"></span>
       </div>
       ${(() => {
@@ -666,9 +700,11 @@ function renderRecipe(body, project, techs) {
       return rowHtml(it);
     }).join('');
     return `
-      <section class="sec" data-sec="${secIdx}">
-        <h2 class="sec-head"><span>${esc(sec.title)}</span><span class="sec-count"></span></h2>
-        ${items}
+      <section class="sec ${secCollapsed(secIdx) ? 'collapsed' : ''}" data-sec="${secIdx}">
+        <h2 class="sec-head"><button class="sec-toggle" aria-expanded="${!secCollapsed(secIdx)}">
+          <span class="sec-title">${esc(sec.title)}</span><span class="sec-count"></span>${chevronIcon}
+        </button></h2>
+        <div class="sec-body">${items}</div>
       </section>`;
   }).join('');
 
@@ -699,6 +735,18 @@ function renderRecipe(body, project, techs) {
   const repeats = {};
   pat.sections.forEach((s) => s.items.forEach((it) => { if (it.type === 'repeat') repeats[it.id] = it; }));
   const blockRows = (rep) => rep.items.filter((r) => isRow(r) && applies(r, si));
+
+  /** Which row may be ticked now, and which tick may be removed. */
+  const tickRules = () => {
+    const pr = progress(project);
+    const idx = pr.next ? pr.rows.findIndex((r) => r.id === pr.next.id) : pr.rows.length;
+    // A fixed-count repeat with every row ticked waits for "Ny gentagelse"
+    const waiting = pr.next && pr.next.repeat && project.done[pr.next.id];
+    let undoId = null;
+    if (waiting) { const br = blockRows(pr.next.repeat); undoId = br[br.length - 1].id; }
+    else if (idx > 0 && project.done[pr.rows[idx - 1].id]) undoId = pr.rows[idx - 1].id;
+    return { pr, nextId: waiting ? null : pr.next?.id, undoId, waiting };
+  };
 
   const updateCounts = () => {
     const pr = progress(project);
@@ -737,10 +785,19 @@ function renderRecipe(body, project, techs) {
       el.querySelector('.rep-last').hidden = !lastRound || finished;
       el.querySelector('.rep-new').classList.toggle('ready', allTicked && !finished);
       el.querySelector('.rep-undo').hidden = n === 0;
-      el.querySelectorAll('.row-num').forEach((num) => { num.textContent = `P ${repNumber(project, rep, +num.dataset.ri)}`; });
+      el.querySelectorAll('.row-num').forEach((num) => {
+        num.textContent = `${repPrefix(rep)} ${repNumber(project, rep, +num.dataset.ri)}`;
+        const slot = num.closest('.row-label').querySelector('.marks');
+        if (slot) slot.innerHTML = marksHtml(repPrefix(rep) === 'P' ? repNumber(project, rep, +num.dataset.ri) : null);
+      });
     });
     body.querySelectorAll('.row.current').forEach((r) => r.classList.remove('current'));
     if (pr.next) body.querySelector(`.row[data-id="${pr.next.id}"]`)?.classList.add('current');
+    const rules = tickRules();
+    body.querySelectorAll('.row').forEach((r) => {
+      const id = r.dataset.id;
+      r.classList.toggle('locked', id !== rules.nextId && id !== rules.undoId);
+    });
     body.querySelector('#next').hidden = !pr.next || isFinished(project);
     // Keep the Opskrift tile in the header in step
     const sub = app.querySelector('.tile[href$="/opskrift"] .tile-sub');
@@ -750,15 +807,37 @@ function renderRecipe(body, project, techs) {
 
   const toggle = async (rowEl) => {
     const rid = rowEl.dataset.id;
-    if (project.done[rid]) delete project.done[rid];
-    else project.done[rid] = Date.now();
+    const { pr, nextId, undoId, waiting } = tickRules();
+    if (project.done[rid]) {
+      if (rid !== undoId) {
+        if (waiting && rid === pr.next.id) {
+          toast('Tryk "Ny gentagelse" for at starte næste gentagelse');
+          const btn = rowEl.closest('.repeat')?.querySelector('.rep-new');
+          btn?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          btn?.classList.add('flash'); setTimeout(() => btn?.classList.remove('flash'), 1200);
+        } else {
+          toast('Du kan kun fjerne fluebenet fra den seneste pind');
+        }
+        return;
+      }
+      delete project.done[rid];
+    } else {
+      if (rid !== nextId) {
+        if (waiting) { toast('Tryk "Ny gentagelse" først'); return; }
+        if (!pr.next) return;
+        toast(`Næste pind er ${displayLabel(project, pr.next)}`);
+        scrollToRow(pr.next.id, true);
+        return;
+      }
+      project.done[rid] = Date.now();
+    }
     rowEl.classList.toggle('done', !!project.done[rid]);
     rowEl.setAttribute('aria-checked', !!project.done[rid]);
     if (!project.started) project.started = true;
     updateCounts();
     await store.saveProject(project);
-    const pr = progress(project);
-    if (pr.total && pr.done === pr.total && project.done[rid] && !isFinished(project)) toast('Alle pinde er strikket! Tryk "Jeg er færdig!" nederst.', 3500);
+    const after = progress(project);
+    if (after.total && after.done === after.total && project.done[rid] && !isFinished(project)) toast('Alle pinde er strikket! Tryk "Jeg er færdig!" nederst.', 3500);
   };
 
   const newRepeat = async (el) => {
@@ -801,6 +880,8 @@ function renderRecipe(body, project, techs) {
       return;
     }
     if (e.target.closest('a')) return;                 // video links open normally
+    const secBtn = e.target.closest('.sec-toggle');
+    if (secBtn) { const secEl = secBtn.closest('.sec'); setSecOpen(secEl, secEl.classList.contains('collapsed'), true); return; }
     if (e.target.closest('.rep-new')) return newRepeat(e.target.closest('.repeat'));
     if (e.target.closest('.rep-undo')) return undoRepeat(e.target.closest('.repeat'));
     const rowEl = e.target.closest('.row');
@@ -810,11 +891,19 @@ function renderRecipe(body, project, techs) {
   const scrollToRow = (rid, smooth) => {
     const el = rid && body.querySelector(`.row[data-id="${rid}"]`);
     if (!el) return false;
+    const secEl = el.closest('.sec');
+    if (secEl?.classList.contains('collapsed')) setSecOpen(secEl, true);
     el.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'center' });
     el.classList.add('flash');
     setTimeout(() => el.classList.remove('flash'), 1200);
     return true;
   };
+
+  function setSecOpen(secEl, open, save) {
+    secEl.classList.toggle('collapsed', !open);
+    secEl.querySelector('.sec-toggle').setAttribute('aria-expanded', open);
+    if (save) { project.secOpen[secEl.dataset.sec] = open; store.saveProject(project); }
+  }
 
   body.querySelector('#next').onclick = () => scrollToRow(progress(project).next?.id, true);
 
@@ -940,6 +1029,7 @@ window.addEventListener('hashchange', route);
 /* ---------- icons ---------- */
 
 const knotImg = '<img class="finish-knot" src="icons/knot.png" alt="">';
+const chevronIcon = '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
 const playIcon = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3v10l8-5z" fill="currentColor"/></svg>';
 const dotsIcon = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>';
 const backIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>';
