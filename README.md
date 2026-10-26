@@ -82,6 +82,7 @@ Menu (•••) on the home screen → **Gem backup af alle projekter**. Save t
 - `rowMarks` — rows the app marks automatically, e.g. buttonholes: `{ "label": "Knaphul", "tech": "knaphul", "first": 4, "every": "{24|26}", "count": "{8|8}" }` marks P 4, P 28, P 52 … Works inside repeat blocks too.
 - `"numberPrefix": "Omg"` on a `repeat` — count rounds instead of rows (Omg 1, Omg 2 …).
 - `yarn` — one entry per yarn the pattern suggests. With more than one, you pick yours from a list under Materialer.
+  Write the amount and the length per skein in `text`, e.g. `"Ca. {19|21|24} g (50 g = 235 m)"` or `"{1|2} nøgle (ca. 100 m pr. 50 g)"`. The project card on a finished project uses it to show how many metres of yarn you used (or grams, when the pattern gives no length).
 - `needles` — the pattern's needles. Under Materialer you can record that you use another size ("Du bruger: 3,5 mm"); the pattern's needle stays visible and the recipe doesn't change.
 - `techniques` + `[[udt]]` in a row — the word becomes tappable and opens the Teknikker tab. `[[indt-r|Indt-r]]` shows different text than the id.
 - `side`: `"RS"` (retside, mustard) or `"VS"` (vrangside, lilac). Leave it out for rounds.

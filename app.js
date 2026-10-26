@@ -161,7 +161,9 @@ const isStarted = (p) => !!p.started;
 /** A project is finished when you tap "Jeg er færdig!" at the bottom of the recipe. */
 const isFinished = (p) => !!p.finished;
 const isFinishedFlag = isFinished;
-const photoOf = (p) => p.photo || p.pattern.photo || null;
+/** Your own photos of the project (older projects had a single `photo`). */
+const photosOf = (p) => p.photos || (p.photo ? [p.photo] : []);
+const photoOf = (p) => photosOf(p)[0] || p.pattern.photo || null;
 
 /** Techniques as a map by id. */
 const techMap = (pattern) => Object.fromEntries((pattern.techniques || []).map((t) => [t.id, t]));
@@ -311,19 +313,28 @@ let photoTarget = null;
 function pickPhoto(project) { photoTarget = project; photoInput.value = ''; photoInput.click(); }
 
 photoInput.addEventListener('change', async () => {
-  const file = photoInput.files[0];
-  if (!file || !photoTarget) return;
+  const files = [...photoInput.files];
+  if (!files.length || !photoTarget) return;
+  const p = photoTarget;
+  const before = photosOf(p);
   try {
-    photoTarget.photo = await shrinkImage(file, 600);
-    await store.saveProject(photoTarget);
-    toast('Billede gemt');
-    route();
-  } catch {
-    toast('Kunne ikke læse billedet.');
+    const added = [];
+    for (const f of files) added.push(await shrinkImage(f, 900));
+    p.photos = [...before, ...added];
+    delete p.photo;
+    await store.saveProject(p);
+    toast(added.length === 1 ? 'Billede gemt' : `${added.length} billeder gemt`);
+  } catch (e) {
+    p.photos = before;
+    toast(e && e.name === 'QuotaExceededError'
+      ? 'Der er ikke plads til flere billeder på telefonen.' : 'Kunne ikke læse billedet.', 3500);
   }
+  const y = window.scrollY;
+  await route();
+  window.scrollTo(0, y);
 });
 
-/** Shrinks a photo to max 600 px so it fits comfortably in storage. */
+/** Shrinks a photo (max side in px) so it fits comfortably in storage. */
 function shrinkImage(file, max) {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -334,7 +345,7 @@ function shrinkImage(file, max) {
       c.height = Math.round(img.height * s);
       c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
       URL.revokeObjectURL(img.src);
-      resolve(c.toDataURL('image/jpeg', 0.8));
+      resolve(c.toDataURL('image/jpeg', 0.78));
     };
     img.onerror = reject;
     img.src = URL.createObjectURL(file);
@@ -595,6 +606,7 @@ function renderMaterials(body, project) {
   });
   body.querySelector('#start')?.addEventListener('click', async () => {
     project.started = true;
+    project.startedAt = project.startedAt || Date.now();
     await store.saveProject(project);
     go(`#/p/${project.id}/opskrift`);
   });
@@ -726,9 +738,7 @@ function renderRecipe(body, project, techs) {
       ${sections}
       <div class="finish">
         ${isFinished(project)
-          ? `<p class="finish-done">${knotImg}Færdig${project.finishedAt ? ` ${new Date(project.finishedAt).toLocaleDateString('da-DK', { day: 'numeric', month: 'long', year: 'numeric' })}` : ''}</p>
-             ${project.photo ? `<img class="finish-photo" src="${project.photo}" alt="Dit færdige strik">` : ''}
-             <button class="pill" id="finish-photo">${project.photo ? 'Skift billede af dit strik' : '＋ Tilføj billede af dit strik'}</button>
+          ? `${doneCard(project)}
              <button class="primary brand finish-btn" id="again">Strik denne opskrift igen</button>
              <button class="link-btn" id="unfinish">Markér som i gang igen</button>`
           : `<button class="primary brand finish-btn" id="finish">Jeg er færdig!</button>`}
@@ -840,6 +850,7 @@ function renderRecipe(body, project, techs) {
     rowEl.classList.toggle('done', !!project.done[rid]);
     rowEl.setAttribute('aria-checked', !!project.done[rid]);
     if (!project.started) project.started = true;
+    if (!project.startedAt) project.startedAt = Date.now();
     updateCounts();
     await store.saveProject(project);
     const after = progress(project);
@@ -940,11 +951,10 @@ function renderRecipe(body, project, techs) {
     project.finishedAt = now;
     project.secOpen = allSecs(project.pattern, false);   // MM-10: fold the whole recipe
     await store.saveProject(project);
-    openSheet('Tillykke – projektet er færdigt! 🧶', [
-      { label: 'Tilføj billede af dit strik', action: () => { pickPhoto(project); go('#/'); } },
-    ], () => go('#/'));
+    scrollToFinish = true;                               // land on the new project card
+    renderProject(project.id, 'opskrift');
   });
-  body.querySelector('#finish-photo')?.addEventListener('click', () => pickPhoto(project));
+  if (isFinished(project)) wireDoneCard(body, project);
   body.querySelector('#again')?.addEventListener('click', async () => {
     // New project with the same pattern; the finished one stays under "Færdige".
     const copy = await createProject(normalizePattern(JSON.parse(JSON.stringify(project.pattern))));
@@ -969,7 +979,8 @@ function renderRecipe(body, project, techs) {
     returnTo = null;
     if (scrollToFinish) {
       scrollToFinish = false;
-      body.querySelector('.finish')?.scrollIntoView({ block: 'end' });
+      const card = body.querySelector('.done-card');
+      if (card) window.scrollTo(0, card.getBoundingClientRect().top + window.scrollY - 12);
       return;
     }
     if (target && scrollToRow(target, false)) return;
@@ -987,10 +998,182 @@ function renderRecipe(body, project, techs) {
   window.addEventListener('scroll', window.__recipeScroll, { passive: true });
 }
 
+/* ----- Project card: shown at the bottom of the recipe when a project is finished ----- */
+
+const DAY = 86400000;
+const FIT = ['Meget lille', 'Lidt lille', 'Som forventet', 'Lidt stor', 'Meget stor'];
+const daDate = (t, opts) => new Date(t).toLocaleDateString('da-DK', opts);
+
+/** When knitting started: saved on "Start strikning" / first tick; older projects use the first tick. */
+function startOf(p) {
+  if (p.startedAt) return p.startedAt;
+  const ticks = Object.values(p.done || {}).filter((v) => typeof v === 'number');
+  return ticks.length ? Math.min(...ticks) : p.created;
+}
+
+/** Rows actually knitted, counting every repeat. */
+function rowsKnitted(p) {
+  let n = 0;
+  for (const r of visibleRows(p)) {
+    if (r.repeat && !repTimes(r.repeat, p.sizeIndex)) n += (p.done[r.id] ? 1 : 0) + repsOf(p, r.repeat);
+    else n += rowStats(p, r).d;
+  }
+  return n;
+}
+
+/** The yarn(s) you knit with: your choice when the pattern suggests several. */
+function yarnsUsed(p) {
+  const ys = p.pattern.yarn || [];
+  if (ys.length > 1 && p.yarnChoice != null && ys[p.yarnChoice]) return [ys[p.yarnChoice]];
+  return ys.slice(0, 1);
+}
+
+/**
+ * Yarn used for the chosen size, from the pattern's yarn text, e.g.
+ * "Ca. {19|21|24} g (50 g = 235 m)" → { m: 113 } and "{1|2} nøgle (ca. 100 m pr. 50 g)" → { m: 100 }.
+ * Without metres per skein it falls back to grams; ranges ("350-400 g") use the middle.
+ */
+function yarnAmount(p) {
+  let m = 0, g = 0, allM = true, any = false;
+  const num = (x) => { const [a, b] = x.split('-').map((v) => parseFloat(v.replace(',', '.'))); return b ? (a + b) / 2 : a; };
+  for (const y of yarnsUsed(p)) {
+    let t = plain(y.text || '', p.sizeIndex);
+    let ratio = null;
+    const r1 = t.match(/(\d+)\s*g\s*=\s*(\d+)\s*m/), r2 = t.match(/(\d+)\s*m\s*(?:pr\.?|per|\/)\s*(\d+)\s*g/);
+    if (r1) ratio = { g: +r1[1], m: +r1[2] }; else if (r2) ratio = { g: +r2[2], m: +r2[1] };
+    t = t.replace(/\([^)]*\)/g, '');                      // drop "(50 g = 235 m)"
+    const grams = t.match(/(\d+(?:[.,]\d+)?(?:\s*-\s*\d+(?:[.,]\d+)?)?)\s*g\b/);
+    const skeins = t.match(/(\d+(?:\s*-\s*\d+)?)\s*n[øo]gle/);
+    const gr = grams ? num(grams[1].replace(/\s/g, '')) : skeins && ratio ? num(skeins[1].replace(/\s/g, '')) * ratio.g : null;
+    if (gr == null) continue;
+    any = true; g += gr;
+    if (ratio) m += (gr / ratio.g) * ratio.m; else allM = false;
+  }
+  if (!any) return null;
+  return allM ? { value: Math.round(m), unit: 'm garn' } : { value: Math.round(g), unit: 'g garn' };
+}
+
+function doneCard(p) {
+  const pat = p.pattern, si = p.sizeIndex;
+  const photos = photosOf(p);
+  const start = startOf(p), end = p.finishedAt || Date.now();
+  const sameYear = new Date(start).getFullYear() === new Date(end).getFullYear();
+  const dates = `${daDate(start, sameYear ? { day: 'numeric', month: 'short' } : { day: 'numeric', month: 'short', year: 'numeric' })} – ${daDate(end, { day: 'numeric', month: 'short', year: 'numeric' })}`;
+  const days = Math.max(1, Math.round((end - start) / DAY));
+  const yarn = yarnAmount(p);
+  const stats = [
+    { n: days, u: days === 1 ? 'dag' : 'dage' },
+    { n: rowsKnitted(p), u: 'pinde' },
+    yarn && { n: yarn.value, u: yarn.unit },
+  ].filter(Boolean);
+
+  const caption = daDate(end, { month: 'short', year: 'numeric' });
+  const shown = photos.slice(0, 3);
+  const polaroids = shown.length
+    ? `<button class="polaroids n${shown.length}" id="dc-photos" aria-label="Se dine billeder (${photos.length})">
+        ${shown.map((src, i) => `<span class="polaroid p${i}"><img src="${src}" alt=""></span>`).reverse().join('')}
+        <span class="polaroid-cap">${esc(caption)}</span>
+        ${photos.length > 3 ? `<span class="polaroid-more">+${photos.length - 3}</span>` : ''}
+      </button>
+      <button class="dc-add" id="dc-add">${plusIcon}Tilføj billede</button>`
+    : `<button class="polaroids empty" id="dc-add">
+        <span class="polaroid p0"><span class="polaroid-empty">${cameraIcon}<b>Tilføj billeder af dit strik</b></span></span>
+        <span class="polaroid-cap">${esc(caption)}</span>
+      </button>`;
+
+  const needleSizes = [...new Set((pat.needles || []).map((n, i) => (p.needles || {})[i] || plain(n.size || '', si)).filter(Boolean))];
+  const matRows = [
+    pat.sizes.length > 1 && si != null && { ic: rulerIcon, k: 'Størrelse', v: pat.sizes[si] },
+    yarnsUsed(p).length && { ic: yarnIcon, k: 'Garn', v: yarnsUsed(p).map((y) => y.name).join(' + ') },
+    needleSizes.length && { ic: needleIcon, k: 'Pinde', v: needleSizes.join(' og ') },
+  ].filter(Boolean);
+
+  return `
+    <section class="done-card" aria-label="Dit færdige projekt">
+      <div class="dc-top">
+        <span class="dc-check">${checkIcon}</span>
+        <h2 class="dc-title">Tillykke, du er færdig!</h2>
+        <p class="dc-dates">${esc(dates)}</p>
+        <div class="dc-photos">${polaroids}</div>
+        <div class="dc-stats">${stats.map((s) => `<div><b>${s.n.toLocaleString('da-DK')}</b><span>${s.u}</span></div>`).join('')}</div>
+      </div>
+      <div class="dc-body">
+        ${matRows.length ? `<div class="dc-field">
+          <h3 class="dc-label">Materialer</h3>
+          <dl class="dc-mats">${matRows.map((r) => `<div>${r.ic}<dt>${r.k}</dt><dd>${esc(r.v)}</dd></div>`).join('')}</dl>
+        </div>` : ''}
+        <label class="dc-field"><span class="dc-label">Strikket til</span>
+          <input id="dc-for" value="${esc(p.knitFor || '')}" placeholder="Fx en gave til…" autocomplete="off"></label>
+        <div class="dc-field"><span class="dc-label" id="dc-fit-l">Hvordan passede den?</span>
+          <div class="dc-fit" role="group" aria-labelledby="dc-fit-l">${FIT.map((f, i) =>
+            `<button data-fit="${i}" aria-pressed="${p.fit === i}">${f}</button>`).join('')}</div></div>
+        <label class="dc-field"><span class="dc-label">Noter</span>
+          <textarea id="dc-notes" rows="3" placeholder="Hvad vil du huske til næste gang?">${esc(p.notes || '')}</textarea></label>
+        <p class="dc-saved">Alt gemmes automatisk. Du kan udfylde det senere.</p>
+      </div>
+    </section>`;
+}
+
+function wireDoneCard(body, p) {
+  let t = 0;
+  const later = () => { clearTimeout(t); t = setTimeout(() => store.saveProject(p), 400); };
+  body.querySelector('#dc-for').addEventListener('input', (e) => { p.knitFor = e.target.value; later(); });
+  body.querySelector('#dc-notes').addEventListener('input', (e) => { p.notes = e.target.value; later(); });
+  body.querySelectorAll('[data-fit]').forEach((b) => b.addEventListener('click', () => {
+    const i = +b.dataset.fit;
+    p.fit = p.fit === i ? null : i;                     // tap again to clear
+    body.querySelectorAll('[data-fit]').forEach((x) => x.setAttribute('aria-pressed', p.fit === +x.dataset.fit));
+    store.saveProject(p);
+  }));
+  body.querySelector('#dc-add')?.addEventListener('click', () => pickPhoto(p));
+  body.querySelector('#dc-photos')?.addEventListener('click', () => openPhotos(p));
+}
+
+/** Full-screen view of your photos: swipe between them, add more or delete one. */
+function openPhotos(p, start = 0) {
+  const photos = photosOf(p);
+  const v = document.createElement('div');
+  v.className = 'viewer';
+  v.setAttribute('role', 'dialog');
+  v.setAttribute('aria-label', 'Dine billeder');
+  v.innerHTML = `
+    <div class="viewer-bar">
+      <span id="v-count"></span>
+      <button class="icon-btn on-brand" id="v-close" aria-label="Luk">${closeIcon}</button>
+    </div>
+    <div class="viewer-strip" id="v-strip">${photos.map((src, i) => `<figure><img src="${src}" alt="Billede ${i + 1} af ${photos.length}"></figure>`).join('')}</div>
+    <div class="viewer-actions">
+      <button class="pill" id="v-add">${plusIcon}Tilføj billede</button>
+      <button class="pill danger" id="v-del">Slet billede</button>
+    </div>`;
+  document.body.appendChild(v);
+  document.body.classList.add('no-scroll');
+  const strip = v.querySelector('#v-strip');
+  const idx = () => Math.round(strip.scrollLeft / strip.clientWidth);
+  const count = () => { v.querySelector('#v-count').textContent = `${idx() + 1} af ${photos.length}`; };
+  strip.addEventListener('scroll', count, { passive: true });
+  requestAnimationFrame(() => { strip.scrollLeft = start * strip.clientWidth; count(); });
+  const close = () => { v.remove(); document.body.classList.remove('no-scroll'); };
+  v.querySelector('#v-close').onclick = close;
+  v.querySelector('#v-add').onclick = () => { close(); pickPhoto(p); };
+  v.querySelector('#v-del').onclick = async () => {
+    const i = idx();
+    if (!(await ask('Slet dette billede?', 'Slet billede', true))) return;
+    p.photos = photos.filter((_, j) => j !== i);
+    delete p.photo;
+    await store.saveProject(p);
+    close();
+    const y = window.scrollY;
+    await route();
+    window.scrollTo(0, y);
+    if (p.photos.length) openPhotos(p, Math.min(i, p.photos.length - 1));
+  };
+}
+
 function projectMenu(project, tab) {
   const wake = store.getSetting('wakeLock', false);
   openSheet(project.pattern.title, [
-    { label: photoOf(project) ? 'Skift billede' : 'Tilføj billede', action: () => pickPhoto(project) },
+    { label: 'Tilføj billede', action: () => pickPhoto(project) },
     {
       label: wake ? 'Hold skærmen tændt: Til' : 'Hold skærmen tændt: Fra',
       action: () => {
@@ -1050,14 +1233,12 @@ function route() {
   window.__recipeScroll = null;
   const m = location.hash.match(/^#\/p\/([^/]+)(?:\/(\w+))?$/);
   window.scrollTo(0, 0);
-  if (m) renderProject(m[1], m[2]);
-  else renderHome();
+  return m ? renderProject(m[1], m[2]) : renderHome();
 }
 window.addEventListener('hashchange', route);
 
 /* ---------- icons ---------- */
 
-const knotImg = '<img class="finish-knot" src="icons/knot.png" alt="">';
 const chevronIcon = '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
 const playIcon = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3v10l8-5z" fill="currentColor"/></svg>';
 const dotsIcon = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>';
@@ -1070,6 +1251,11 @@ const purlIcon = '<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" str
 const yarnIcon = '<svg class="tile-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="13" r="7"/><path d="M5 11c4 1 8 0 11-4M6 16c4 1 9-1 11-5"/><path d="M16 4l5-1"/></svg>';
 const bookIcon = '<svg class="tile-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h6a2 2 0 0 1 2 2v12a2 2 0 0 0-2-2H4z"/><path d="M20 5h-6a2 2 0 0 0-2 2v12a2 2 0 0 1 2-2h6z"/></svg>';
 const listIcon = '<svg class="tile-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7l2 2 3-3M4 15l2 2 3-3M12 8h8M12 16h8"/></svg>';
+
+const plusIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
+const cameraIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
+const needleIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 19L19 5M8 20l13-13"/></svg>';
+const closeIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
 
 /* ---------- start ---------- */
 
