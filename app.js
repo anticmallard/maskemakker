@@ -165,6 +165,9 @@ const isStarted = (p) => !!p.started;
 /** A project is finished when you tap "Jeg er færdig!" at the bottom of the recipe. */
 const isFinished = (p) => !!p.finished;
 const isFinishedFlag = isFinished;
+/** The pattern's own photos (MM-12). Older pattern files only have one cropped `photo`. */
+const patternPhotos = (pat) => (pat.photos && pat.photos.length ? pat.photos : pat.photo ? [pat.photo] : []);
+
 /** Your own photos of the project (older projects had a single `photo`). */
 const photosOf = (p) => p.photos || (p.photo ? [p.photo] : []);
 const photoOf = (p) => photosOf(p)[0] || p.pattern.photo || null;
@@ -299,7 +302,18 @@ const sameRecipe = (a, b) => a.title === b.title && (a.designer || '') === (b.de
 /** Saves a pattern in the library. Importing the same pattern again updates it instead of adding a copy. */
 async function addRecipe(pattern) {
   const existing = (await store.listRecipes()).find((r) => sameRecipe(r.pattern, pattern));
-  if (existing) { existing.pattern = clone(pattern); await store.saveRecipe(existing); return { recipe: existing, isNew: false }; }
+  if (existing) {
+    existing.pattern = clone(pattern);
+    await store.saveRecipe(existing);
+    // Display-only fields are safe to copy into projects knitted from it (rows and ticks are untouched).
+    const SAFE = ['photo', 'photos', 'measurements', 'sizeGuide', 'tips', 'intro'];
+    for (const p of await store.listProjects()) {
+      if (p.recipeId !== existing.id) continue;
+      for (const k of SAFE) { if (pattern[k] != null) p.pattern[k] = clone(pattern[k]); else delete p.pattern[k]; }
+      await store.saveProject(p);
+    }
+    return { recipe: existing, isNew: false };
+  }
   const recipe = await store.saveRecipe({ id: uid(), pattern: clone(pattern), added: Date.now() });
   return { recipe, isNew: true };
 }
@@ -646,7 +660,7 @@ async function renderProject(id, tab) {
     <main class="proj" id="tab-body"></main>`;
 
   const body = app.querySelector('#tab-body');
-  if (tab === 'materialer') renderMaterials(body, project);
+  if (tab === 'materialer') renderMaterials(body, project, isFinished(project) ? null : await previousProject(project));
   if (tab === 'teknikker') renderTechniques(body, project);
   if (tab === 'opskrift') renderRecipe(body, project, techs);
 
@@ -657,15 +671,54 @@ async function renderProject(id, tab) {
 
 /* ----- Materialer tab ----- */
 
-function renderMaterials(body, project) {
+/**
+ * MM-16: the most recently finished project from the same recipe (not this one), so a new
+ * project can show what you noted last time.
+ */
+async function previousProject(project) {
+  const same = (p) => (project.recipeId && p.recipeId ? p.recipeId === project.recipeId : sameRecipe(p.pattern, project.pattern));
+  return (await store.listProjects())
+    .filter((p) => p.id !== project.id && isFinished(p) && same(p))
+    .sort((a, b) => (b.finishedAt || 0) - (a.finishedAt || 0))[0] || null;
+}
+
+const FIT_PHRASE = ['blev meget lille', 'blev lidt lille', 'passede som forventet', 'blev lidt stor', 'blev meget stor'];
+
+/** The "Fra sidste gang" box at the top of Materialer. */
+function lastTimeHtml(prev) {
+  const pat = prev.pattern;
+  const size = prev.sizeIndex != null && pat.sizes.length > 1 ? pat.sizes[prev.sizeIndex] : null;
+  const fit = prev.fit != null ? FIT_PHRASE[prev.fit] : null;
+  const dot = (t) => (t.endsWith('.') ? t : `${t}.`);   // "3-6 mdr." already ends with a full stop
+  const yarn = yarnsUsed(prev).map((y) => y.name).join(' + ');
+  const needles = needleSizesOf(prev).join(' og ');
+  // "Du strikkede størrelse 1-2 år med Sunday fra Sandnes Garn på 3 mm pinde. Den blev meget stor."
+  const parts = [size && `størrelse ${size}`, yarn && `med ${yarn}`, needles && `på ${needles} pinde`].filter(Boolean);
+  const line = [parts.length && dot(`Du strikkede ${parts.join(' ')}`), fit && `Den ${fit}.`].filter(Boolean).join(' ');
+  const photo = photosOf(prev)[0];
+  const when = prev.finishedAt ? daDate(prev.finishedAt, { month: 'short', year: 'numeric' }) : '';
+  return `
+    <section class="last-time" aria-label="Fra sidste gang">
+      ${photo ? `<img src="${photo}" alt="Dit strik fra sidste gang">` : ''}
+      <div class="last-text">
+        <h3>Fra sidste gang${when ? ` · ${esc(when)}` : ''}</h3>
+        ${line ? `<p class="last-fit">${esc(line)}</p>` : ''}
+        ${prev.notes ? `<p class="last-notes">"${esc(prev.notes.trim())}"</p>` : ''}
+      </div>
+    </section>`;
+}
+
+function renderMaterials(body, project, prev = null) {
   const pat = project.pattern;
   const si = project.sizeIndex;
   const details = pat.sizeDetails || [];
   const started = isStarted(project);
+  const lastSize = prev ? prev.sizeIndex : null;
+  const lastTag = 'Brugt sidst';   // same wording as under Garn; the fit is in the box above
 
   const sizeBtns = pat.sizes.map((s, i) => `
     <button class="size-btn ${i === si ? 'on' : ''}" data-size="${i}">
-      <b>${esc(s)}</b>${details[i] ? `<span>${esc(details[i])}</span>` : ''}
+      <b>${esc(s)}</b>${details[i] ? `<span>${esc(details[i])}</span>` : ''}${i === lastSize ? `<span class="last-tag">${esc(lastTag)}</span>` : ''}
     </button>`).join('');
 
   // Older pattern files: one plain list
@@ -680,7 +733,7 @@ function renderMaterials(body, project) {
       ${yarnOpts.map((y, i) => `
         <button class="choice ${project.yarnChoice === i ? 'on' : ''}" data-yarn="${i}" role="radio" aria-checked="${project.yarnChoice === i}">
           <span class="radio"></span>
-          <span class="choice-body"><b>${esc(y.name)}</b>${y.text ? `<span>${renderText(y.text, si)}</span>` : ''}</span>
+          <span class="choice-body"><b>${esc(y.name)}</b>${y.text ? `<span>${renderText(y.text, si)}</span>` : ''}${prev && prev.yarnChoice === i ? '<span class="last-tag">Brugt sidst</span>' : ''}</span>
         </button>`).join('')}
     </div>` : yarnOpts.length === 1 ? `
     <div class="panel"><div class="list-row"><b>${esc(yarnOpts[0].name)}</b>${yarnOpts[0].text ? `<br>${renderText(yarnOpts[0].text, si)}` : ''}</div></div>` : '';
@@ -720,15 +773,38 @@ function renderMaterials(body, project) {
     started ? 'Skifter du størrelse, skifter alle tal i opskriften med.' : '',
   ].filter(Boolean).join(' ');
 
+  // Finished measurements and size advice belong with Størrelse
+  const meas = pat.measurements || [];
+  const sizeInfo = meas.length || pat.sizeGuide ? `
+    <div class="panel size-info">
+      ${meas.length ? `<div class="size-info-head">Færdige mål${si != null ? ` · ${esc(pat.sizes[si])}` : ''}</div>
+        ${si == null ? '<p class="size-info-wait">Vælg en størrelse for at se målene.</p>'
+          : `<div class="gauge">${meas.map((m) => `<div class="gauge-cell"><span>${esc(m.label)}</span><b>${renderText(m.text, si)}</b></div>`).join('')}</div>`}` : ''}
+      ${pat.sizeGuide ? `<p class="size-guide">${renderText(pat.sizeGuide, si)}</p>` : ''}
+    </div>` : '';
+
+  const gal = patternPhotos(pat);
+  const galleryHtml = gal.length ? `
+    <div class="gallery" role="region" aria-roledescription="karrusel" aria-label="Billeder af ${esc(pat.title)}">
+      <div class="gal-strip" id="gal-strip">${gal.map((src, i) => `<img src="${src}" alt="${esc(pat.title)}, billede ${i + 1} af ${gal.length}">`).join('')}</div>
+      ${gal.length > 1 ? `
+        <button class="gal-btn prev" id="gal-prev" aria-label="Forrige billede" hidden>${backIcon}</button>
+        <button class="gal-btn next" id="gal-next" aria-label="Næste billede">${backIcon}</button>
+        <span class="gal-count" id="gal-count" aria-live="polite">1 / ${gal.length}</span>` : ''}
+    </div>` : '';
+
   body.innerHTML = `
     <div class="tab-pad">
+      ${galleryHtml}
       ${!started ? `
         <h2 class="tab-title">Klar til at slå op?</h2>
         <p class="tab-lead">Vælg størrelse først. Så viser opskriften og garnmængden kun dine tal.</p>` : ''}
+      ${prev ? lastTimeHtml(prev) : ''}
       ${pat.sizes.length > 1 ? `
         <h3 class="block-title">Størrelse</h3>
         <div class="size-grid">${sizeBtns}</div>
-        ${hint ? `<p class="hint">${hint}</p>` : ''}` : ''}
+        ${hint ? `<p class="hint">${hint}</p>` : ''}
+        ${sizeInfo}` : ''}
       ${materials ? `<h3 class="block-title">Garn og pinde</h3><div class="panel">${materials}</div>` : ''}
       ${yarnHtml ? `<h3 class="block-title">Garn</h3>${yarnHtml}` : ''}
       ${(pat.notions || []).length ? `<h3 class="block-title">Tilbehør</h3><div class="panel">${pat.notions.map((n) => `<div class="list-row">${renderText(n.text, si)}</div>`).join('')}</div>` : ''}
@@ -741,6 +817,22 @@ function renderMaterials(body, project) {
       <div class="end-space"></div>
     </div>
     ${!started ? `<div class="dock"><button class="primary brand" id="start" ${si == null ? 'disabled' : ''}>${si == null ? 'Vælg størrelse for at starte' : 'Start strikning →'}</button></div>` : ''}`;
+
+  // Gallery: swipe, or tap the arrows
+  const strip = body.querySelector('#gal-strip');
+  if (strip && gal.length > 1) {
+    const idx = () => Math.round(strip.scrollLeft / strip.clientWidth);
+    const sync = () => {
+      const i = idx();
+      body.querySelector('#gal-prev').hidden = i === 0;
+      body.querySelector('#gal-next').hidden = i === gal.length - 1;
+      body.querySelector('#gal-count').textContent = `${i + 1} / ${gal.length}`;
+    };
+    const goTo = (i) => strip.scrollTo({ left: i * strip.clientWidth, behavior: 'smooth' });
+    body.querySelector('#gal-prev').onclick = () => goTo(idx() - 1);
+    body.querySelector('#gal-next').onclick = () => goTo(idx() + 1);
+    strip.addEventListener('scroll', () => requestAnimationFrame(sync), { passive: true });
+  }
 
   body.querySelectorAll('[data-size]').forEach((b) => b.onclick = async () => {
     const y = window.scrollY;
@@ -1104,7 +1196,7 @@ function renderRecipe(body, project, techs) {
     const above = r.bottom < 0;
     const below = r.top > window.innerHeight - 80;   // room for the button itself
     btn.classList.toggle('away', !folded && !above && !below);
-    btn.textContent = above ? 'Gå til næste pind ↑' : below ? 'Gå til næste pind ↓' : 'Vis næste pind';
+    btn.textContent = above ? 'Gå til næste pind ↑' : below ? 'Gå til næste pind ↓' : 'Gå til næste pind';
   }
 
   body.querySelector('#next').onclick = () => scrollToRow(progress(project).next?.id, true);
@@ -1234,6 +1326,11 @@ function tickAll(p, now) {
   }
 }
 
+/** The needle sizes you used: your own choice where you changed it, else the pattern's. */
+function needleSizesOf(p) {
+  return [...new Set((p.pattern.needles || []).map((n, i) => (p.needles || {})[i] || plain(n.size || '', p.sizeIndex)).filter(Boolean))];
+}
+
 function doneCard(p) {
   const pat = p.pattern, si = p.sizeIndex;
   const photos = photosOf(p);
@@ -1262,7 +1359,7 @@ function doneCard(p) {
         <span class="polaroid-cap">${esc(caption)}</span>
       </button>`;
 
-  const needleSizes = [...new Set((pat.needles || []).map((n, i) => (p.needles || {})[i] || plain(n.size || '', si)).filter(Boolean))];
+  const needleSizes = needleSizesOf(p);
   const matRows = [
     pat.sizes.length > 1 && si != null && { ic: rulerIcon, k: 'Størrelse', v: pat.sizes[si] },
     yarnsUsed(p).length && { ic: yarnIcon, k: 'Garn', v: yarnsUsed(p).map((y) => y.name).join(' + ') },

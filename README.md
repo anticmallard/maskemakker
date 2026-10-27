@@ -86,9 +86,11 @@ Menu (•••) on the home screen → **Gem backup af alle projekter**. The ba
 
 - `{10|12|14}` — one number per size, in the same order as `sizes`. Use `-` where a size has no value.
 - `sizeDetails` — what each size means (shown on the size buttons under Materialer).
+- `measurements` — finished measurements per size, e.g. `[{ "label": "Overvidde", "text": "{50|52} cm" }]`, and `sizeGuide` — advice on choosing a size. Both are shown under **Størrelse** in Materialer (measurements only once a size is chosen). Put anything about overall measurements here, not under `tips`.
 - `notions` — other things you need, e.g. buttons (shown under "Tilbehør").
 - `rowMarks` — rows the app marks automatically, e.g. buttonholes: `{ "label": "Knaphul", "tech": "knaphul", "first": 4, "every": "{24|26}", "count": "{8|8}" }` marks P 4, P 28, P 52 … Works inside repeat blocks too.
 - `"numberPrefix": "Omg"` on a `repeat` — count rounds instead of rows (Omg 1, Omg 2 …).
+- `photo` — one small cover photo (data URL), used on cards and in the header. `photos` — the pattern's own photos, shown large at the top of Materialer with arrows to page through them. Leave both out and nothing is shown. Keep them small (about 560 × 700 px JPEG): everything is stored on the phone.
 - `yarn` — one entry per yarn the pattern suggests. With more than one, you pick yours from a list under Materialer.
   Write the amount and the length per skein in `text`, e.g. `"Ca. {19|21|24} g (50 g = 235 m)"` or `"{1|2} nøgle (ca. 100 m pr. 50 g)"`. The project card on a finished project uses it to show how many metres of yarn you used (or grams, when the pattern gives no length).
 - `needles` — the pattern's needles. Under Materialer you can record that you use another size ("Du bruger: 3,5 mm"); the pattern's needle stays visible and the recipe doesn't change.
