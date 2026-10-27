@@ -41,7 +41,7 @@ Every imported pattern stays under **Opskrifter**, so you can start a new projec
 
 ## About page and contact email
 
-The **Om Maskemakker** page (link at the bottom of the home screen, and in the ••• menu) shows copyright info, a note that patterns belong to their designers, and a contact email. The email and version are set at the top of `app.js`: `CONTACT_EMAIL` and `APP_VERSION`.
+The **Om Maskemakker** page (in the ••• menu on the home screen) shows copyright info, a note that patterns belong to their designers, and a contact email. The email and version are set at the top of `app.js`: `CONTACT_EMAIL` and `APP_VERSION`.
 
 ## Backup
 

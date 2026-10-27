@@ -241,10 +241,6 @@ a { color: inherit; }
 .sheet-btn.sheet-rec { display: flex; align-items: center; gap: 12px; padding: 10px 4px; border-radius: 0; border-bottom: 1px solid var(--line); }
 .sheet-btn.sheet-rec .rec-pic { width: 48px; height: 48px; }
 
-.home-foot {
-  display: block; text-align: center; margin: 28px 0 0; padding: 10px;
-  font-size: 13px; font-weight: 600; color: var(--muted); text-decoration: none;
-}
 
 /* ---------- about page (MM-19) ---------- */
 

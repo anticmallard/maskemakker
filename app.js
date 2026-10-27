@@ -156,7 +156,9 @@ function progress(project) {
   let done = 0, total = 0;
   for (const r of rows) { const st = rowStats(project, r); done += st.d; total += st.w; }
   const next = rows.find((r) => !rowDone(project, r, false));
-  return { rows, done, total, pct: total ? Math.round((done / total) * 100) : 0, next };
+  // A finished project counts as 100 %, even if some rows were never ticked.
+  if (project.finished) done = total;
+  return { rows, done, total, pct: total ? Math.round((done / total) * 100) : project.finished ? 100 : 0, next };
 }
 
 const isStarted = (p) => !!p.started;
@@ -485,7 +487,6 @@ async function renderHome(view = 'projekter') {
       <button class="icon-btn on-brand" id="home-menu" aria-label="Menu">${dotsIcon}</button>
     </header>
     <main class="home">${view === 'opskrifter' ? recipesView : projectsView}
-      <a class="home-foot" href="#/om">Om Maskemakker · Kontakt</a>
     </main>
     <nav class="tabbar" aria-label="Forside">
       <a href="#/" ${view === 'projekter' ? 'aria-current="page"' : ''}><span class="tb-ic">${needleIcon}</span>Projekter</a>
@@ -497,7 +498,6 @@ async function renderHome(view = 'projekter') {
   app.querySelectorAll('[data-start]').forEach((b) => b.onclick = () => startFromRecipe(recipes.find((r) => r.id === b.dataset.start)));
   app.querySelectorAll('[data-more]').forEach((b) => b.onclick = () => recipeMenu(recipes.find((r) => r.id === b.dataset.more)));
   app.querySelector('#home-menu').onclick = () => openSheet('Maskemakker', [
-    { label: 'Importér opskrift', action: () => pickFile('library') },
     { label: 'Gem backup af alle projekter', action: exportBackup },
     { label: 'Tilføj eksempelopskrift', action: loadExample },
     { label: 'Om Maskemakker', action: () => go('#/om') },
@@ -933,7 +933,7 @@ function renderRecipe(body, project, techs) {
   const updateCounts = () => {
     const pr = progress(project);
     const secStats = (secIdx) => pr.rows.filter((r) => r.sec === secIdx)
-      .reduce((a, r) => { const st = rowStats(project, r); return { w: a.w + st.w, d: a.d + st.d }; }, { w: 0, d: 0 });
+      .reduce((a, r) => { const st = rowStats(project, r); return { w: a.w + st.w, d: a.d + (isFinished(project) ? st.w : st.d) }; }, { w: 0, d: 0 });
     body.querySelector('#pc-pct').textContent = `${pr.pct}% strikket`;
     body.querySelector('#pc-count').textContent = `${pr.done} af ${pr.total} pinde`;
     const current = pr.next?.sec;
@@ -943,7 +943,7 @@ function renderRecipe(body, project, techs) {
       seg.firstElementChild.style.width = st.w ? `${(st.d / st.w) * 100}%` : '0';
       seg.classList.toggle('complete', st.w > 0 && st.d === st.w);
     });
-    body.querySelector('#pc-now').innerHTML = pr.next
+    body.querySelector('#pc-now').innerHTML = isFinished(project) ? '<b>Projektet er færdigt</b>' : pr.next
       ? `Nu: <b>${esc(pat.sections[current].title)}</b> · ${esc(displayLabel(project, pr.next) || 'næste pind')}`
       : '<b>Alle pinde er strikket</b>';
     body.querySelectorAll('.sec').forEach((secEl) => {
