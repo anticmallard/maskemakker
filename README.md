@@ -33,11 +33,19 @@ If you already added the old "Strik" app to your home screen, delete that icon a
 
 1. Send Claude the pattern PDF. Claude sends back a `.json` file.
 2. Save it to the Files app (iCloud Drive or On My iPhone).
-3. In the app: **＋ Importér opskrift** → pick the file.
+3. In the app, either:
+   - tap the **Start nyt projekt** card under Projekter → **Importér ny opskrift**: the pattern is saved and a project starts, or
+   - go to **Opskrifter** (bottom menu) → **Importér ny opskrift**: the pattern is only saved.
+
+Every imported pattern stays under **Opskrifter**, so you can start a new project from it later without importing the file again. Deleting a project keeps its pattern; delete a pattern from its ••• menu under Opskrifter (your projects are kept). Importing the same pattern again updates it instead of adding a copy.
+
+## About page and contact email
+
+The **Om Maskemakker** page (link at the bottom of the home screen, and in the ••• menu) shows copyright info, a note that patterns belong to their designers, and a contact email. The email and version are set at the top of `app.js`: `CONTACT_EMAIL` and `APP_VERSION`.
 
 ## Backup
 
-Menu (•••) on the home screen → **Gem backup af alle projekter**. Save the file to iCloud Drive. Import it the same way as a pattern to restore. Do this now and then — if you delete the home-screen app, its data is gone.
+Menu (•••) on the home screen → **Gem backup af alle projekter**. The backup includes your patterns under Opskrifter. Save the file to iCloud Drive. Import it the same way as a pattern to restore. Do this now and then — if you delete the home-screen app, its data is gone.
 
 ## Pattern file format
 

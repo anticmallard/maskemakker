@@ -181,6 +181,84 @@ a { color: inherit; }
 .empty p { margin: 0 0 18px; }
 .link-btn { color: var(--plum); font-weight: 600; padding: 8px; }
 
+/* ---------- home: bottom menu, start card, recipes (MM-9) ---------- */
+
+.home { padding-bottom: calc(env(safe-area-inset-bottom) + 110px); }
+.tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+  background: var(--surface); border-top: 1px solid var(--line);
+  padding: 8px 40px calc(env(safe-area-inset-bottom) + 10px);
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+}
+.tabbar a {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 2px 0;
+  font-size: 12px; font-weight: 700; color: var(--muted); text-decoration: none;
+}
+.tb-ic { width: 56px; height: 30px; border-radius: 99px; display: grid; place-items: center; }
+.tb-ic svg { width: 22px; height: 22px; }
+.tabbar a[aria-current="page"] { color: var(--plum); }
+.tabbar a[aria-current="page"] .tb-ic { background: var(--plum-soft); }
+
+.start-card {
+  text-align: left; padding: 0; box-shadow: none;
+  border: 2px dashed var(--vs-line); background: var(--plum-soft);
+}
+.start-card .card-pic { display: grid; place-items: center; }
+.start-plus {
+  width: 64px; height: 64px; border-radius: 50%; background: var(--surface); color: var(--plum);
+  display: grid; place-items: center; box-shadow: 0 4px 12px rgba(107, 43, 88, .15);
+}
+.start-plus svg { width: 30px; height: 30px; }
+
+.import-row {
+  width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; margin-top: 12px;
+  border: 1.5px dashed var(--vs-line); background: var(--plum-soft); color: var(--plum);
+  border-radius: 14px; padding: 12px 14px;
+}
+.import-row .file-ic { width: 24px; height: 24px; flex: none; }
+.import-row > span { display: flex; flex-direction: column; gap: 1px; }
+.import-row b { font-size: 16px; }
+.import-row span span { font-size: 13px; color: var(--muted); }
+
+.recipe-list { background: var(--surface); border-radius: 16px; padding: 2px 4px 2px 14px; box-shadow: var(--shadow); }
+.recipe-row { display: flex; align-items: center; border-bottom: 1px solid var(--line); }
+.recipe-row:last-child { border-bottom: 0; }
+.recipe-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 10px 0; text-align: left; }
+.rec-pic { width: 56px; height: 56px; border-radius: 12px; object-fit: cover; flex: none; }
+.rec-pic.rec-empty { background: var(--brand); display: grid; place-items: center; }
+.rec-pic.rec-empty img { width: 55%; opacity: .6; }
+.rec-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.rec-title { font: 600 17px/1.2 var(--serif); }
+.rec-meta { font-size: 13px; color: var(--muted); }
+.rec-status { font-size: 13px; font-weight: 600; color: var(--muted); }
+.rec-status.now { color: var(--plum); }
+.recipe-more { color: var(--muted); }
+.rec-chev { width: 18px; height: 18px; color: var(--muted); flex: none; }
+
+.sheet-title.big { text-align: left; font: 700 22px var(--serif); color: var(--ink); padding: 10px 4px 12px; }
+.sheet-btn.import-row { display: flex; margin: 0 0 4px; font-size: inherit; }
+.sheet-sub { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: 14px 4px 4px; }
+.sheet-btn.sheet-rec { display: flex; align-items: center; gap: 12px; padding: 10px 4px; border-radius: 0; border-bottom: 1px solid var(--line); }
+.sheet-btn.sheet-rec .rec-pic { width: 48px; height: 48px; }
+
+.home-foot {
+  display: block; text-align: center; margin: 28px 0 0; padding: 10px;
+  font-size: 13px; font-weight: 600; color: var(--muted); text-decoration: none;
+}
+
+/* ---------- about page (MM-19) ---------- */
+
+.about { padding: 20px 20px calc(env(safe-area-inset-bottom) + 40px); max-width: 560px; margin: 0 auto; }
+.about-knot { display: block; width: 72px; margin: 4px auto 14px; }
+.about-lead { font: 600 19px/1.4 var(--serif); text-align: center; margin: 0 0 8px; }
+.about-sec { background: var(--surface); border-radius: 16px; padding: 14px 16px; margin-top: 14px; box-shadow: var(--shadow); }
+.about-sec h2 { margin: 0 0 6px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.about-sec p { margin: 0 0 8px; font-size: 15px; line-height: 1.5; }
+.about-sec p:last-child { margin-bottom: 0; }
+.about-mail { display: flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; margin-top: 6px; font-size: 16px; }
+.about-mail svg { width: 20px; height: 20px; flex: none; }
+.about-version { text-align: center; font-size: 13px; color: var(--muted); margin: 18px 0 0; }
+
 .dock {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
   padding: 12px 16px calc(env(safe-area-inset-bottom) + 12px);

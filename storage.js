@@ -47,6 +47,42 @@ export async function deleteProject(id) {
   writeAll(all);
 }
 
+// ----- Recipe library (MM-9) -----
+// Every imported pattern is kept here, so a new project can start from it later.
+// A project keeps its own copy of the pattern, so deleting a recipe never touches projects.
+const RECIPES_KEY = 'strik.recipes.v1';
+
+function readRecipes() {
+  try {
+    return JSON.parse(localStorage.getItem(RECIPES_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
+/** All recipes, most recently used or added first. */
+export async function listRecipes() {
+  return Object.values(readRecipes()).sort((a, b) => (b.used || b.added) - (a.used || a.added));
+}
+
+export async function getRecipe(id) {
+  return readRecipes()[id] || null;
+}
+
+export async function saveRecipe(recipe) {
+  const all = readRecipes();
+  recipe.updated = Date.now();
+  all[recipe.id] = recipe;
+  localStorage.setItem(RECIPES_KEY, JSON.stringify(all));
+  return recipe;
+}
+
+export async function deleteRecipe(id) {
+  const all = readRecipes();
+  delete all[id];
+  localStorage.setItem(RECIPES_KEY, JSON.stringify(all));
+}
+
 // Small device settings (like "keep screen on"). These stay on the
 // device even in version 2 — they're about this phone, not your knitting.
 export function getSetting(name, fallback) {

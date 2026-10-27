@@ -7,6 +7,8 @@ const photoInput = document.getElementById('photo-input');
 const sheet = document.getElementById('sheet');
 
 const TABS = ['materialer', 'teknikker', 'opskrift'];
+const APP_VERSION = '27. oktober 2026';
+const CONTACT_EMAIL = 'contact@maskemakker.com';   // MM-20: replace with the real address
 
 /* ---------- helpers ---------- */
 
@@ -261,7 +263,12 @@ function ask(question, label, danger = false) {
 
 /* ---------- import, photos, backup ---------- */
 
-function pickFile() { fileInput.value = ''; fileInput.click(); }
+/**
+ * Pick a pattern file. `then` says what happens after it's saved in the library:
+ * 'start' starts a project straight away, 'library' stays on Opskrifter.
+ */
+let importThen = 'start';
+function pickFile(then = 'start') { importThen = then; fileInput.value = ''; fileInput.click(); }
 
 fileInput.addEventListener('change', async () => {
   const file = fileInput.files[0];
@@ -269,21 +276,66 @@ fileInput.addEventListener('change', async () => {
   try {
     const data = JSON.parse(await file.text());
     if (data.kind === 'strik-backup') {
-      for (const p of data.projects) await store.saveProject(p);
-      toast(`${data.projects.length} projekt(er) gendannet`);
+      for (const p of data.projects || []) await store.saveProject(p);
+      for (const r of data.recipes || []) await store.saveRecipe(r);
+      toast(`${(data.projects || []).length} projekt(er) gendannet`);
       route();
       return;
     }
-    const project = await createProject(normalizePattern(data));
-    go(`#/p/${project.id}`);
+    const { recipe, isNew } = await addRecipe(normalizePattern(data));
+    if (importThen === 'start') { await startFromRecipe(recipe); return; }
+    toast(isNew ? 'Opskriften er gemt i Opskrifter' : 'Opskriften er opdateret');
+    route();
   } catch (err) {
     toast('Kunne ikke importere filen: ' + err.message, 4500);
   }
 });
 
-async function createProject(pattern) {
+const clone = (x) => JSON.parse(JSON.stringify(x));
+const sameRecipe = (a, b) => a.title === b.title && (a.designer || '') === (b.designer || '');
+
+/** Saves a pattern in the library. Importing the same pattern again updates it instead of adding a copy. */
+async function addRecipe(pattern) {
+  const existing = (await store.listRecipes()).find((r) => sameRecipe(r.pattern, pattern));
+  if (existing) { existing.pattern = clone(pattern); await store.saveRecipe(existing); return { recipe: existing, isNew: false }; }
+  const recipe = await store.saveRecipe({ id: uid(), pattern: clone(pattern), added: Date.now() });
+  return { recipe, isNew: true };
+}
+
+/** New project from a recipe in the library, then straight to Materialer to choose a size. */
+async function startFromRecipe(recipe) {
+  const project = await createProject(normalizePattern(clone(recipe.pattern)), recipe.id);
+  recipe.used = Date.now();
+  await store.saveRecipe(recipe);
+  go(`#/p/${project.id}`);
+}
+
+/**
+ * Keeps the library in step: projects from before the library existed get their recipe added,
+ * and the example recipe is added once (it can be deleted like any other).
+ */
+async function syncLibrary(projects) {
+  const recipes = await store.listRecipes();
+  for (const p of projects) {
+    if (p.recipeId) continue;
+    let r = recipes.find((x) => sameRecipe(x.pattern, p.pattern));
+    if (!r) { r = await store.saveRecipe({ id: uid(), pattern: clone(p.pattern), added: p.created || Date.now() }); recipes.push(r); }
+    p.recipeId = r.id;
+    await store.saveProject(p);
+  }
+  if (!store.getSetting('exampleAdded', false)) {
+    try {
+      const res = await fetch('patterns/eksempel.json', { cache: 'no-store' });
+      await addRecipe(normalizePattern(await res.json()));
+      store.setSetting('exampleAdded', true);
+    } catch { /* offline: try again next time */ }
+  }
+}
+
+async function createProject(pattern, recipeId = null) {
   return store.saveProject({
     id: uid(),
+    recipeId,
     pattern,
     sizeIndex: pattern.sizes.length === 1 ? 0 : null,
     done: {},
@@ -302,8 +354,9 @@ function allSecs(pattern, open) {
 async function loadExample() {
   try {
     const res = await fetch('patterns/eksempel.json', { cache: 'no-store' });
-    const project = await createProject(normalizePattern(await res.json()));
-    go(`#/p/${project.id}`);
+    await addRecipe(normalizePattern(await res.json()));
+    toast('Eksempelopskriften er lagt i Opskrifter');
+    go('#/opskrifter');
   } catch {
     toast('Kunne ikke hente eksemplet.');
   }
@@ -354,7 +407,8 @@ function shrinkImage(file, max) {
 
 async function exportBackup() {
   const projects = await store.listProjects();
-  const json = JSON.stringify({ kind: 'strik-backup', exported: new Date().toISOString(), projects }, null, 2);
+  const recipes = await store.listRecipes();
+  const json = JSON.stringify({ kind: 'strik-backup', exported: new Date().toISOString(), projects, recipes }, null, 2);
   const name = `maskemakker-backup-${new Date().toISOString().slice(0, 10)}.json`;
   const file = new File([json], name, { type: 'application/json' });
   if (navigator.canShare?.({ files: [file] })) {
@@ -369,9 +423,11 @@ async function exportBackup() {
 
 /* ---------- home screen ---------- */
 
-async function renderHome() {
+async function renderHome(view = 'projekter') {
   releaseWakeLock();
   const projects = await store.listProjects();
+  await syncLibrary(projects);
+  const recipes = await store.listRecipes();
   const active = projects.filter((p) => !isFinished(p));
   const finished = projects.filter(isFinished);
 
@@ -397,6 +453,30 @@ async function renderHome() {
         </div>
       </a>`;
   };
+  const startCard = `
+    <button class="card start-card" id="start-new">
+      <div class="card-pic"><span class="start-plus">${plusIcon}</span></div>
+      <div class="card-body">
+        <div class="card-title">Start nyt projekt</div>
+        <div class="card-meta">Vælg opskrift eller importér</div>
+      </div>
+    </button>`;
+
+  const projectsView = `
+    <div class="group-label">I gang · ${active.length}</div>
+    <div class="cards">${active.map(card).join('')}${startCard}</div>
+    <div class="group-label">Færdige · ${finished.length}</div>
+    ${finished.length ? `<div class="cards">${finished.map(card).join('')}</div>` : '<div class="placeholder">Færdige projekter samles her</div>'}`;
+
+  const recipesView = `
+    <button class="import-row" id="import-lib">${fileIcon}<span><b>Importér ny opskrift</b><span>Den bliver gemt her til næste gang</span></span></button>
+    <div class="group-label">Dine opskrifter · ${recipes.length}</div>
+    ${recipes.length ? `<div class="recipe-list">${recipes.map((r) => `
+      <div class="recipe-row">
+        <button class="recipe-main" data-start="${r.id}" aria-label="Start nyt projekt med ${esc(r.pattern.title)}">${recipeLine(r, projects)}</button>
+        <button class="icon-btn recipe-more" data-more="${r.id}" aria-label="Mere for ${esc(r.pattern.title)}">${dotsIcon}</button>
+      </div>`).join('')}</div>`
+      : '<div class="placeholder">Opskrifter, du importerer, samles her</div>'}`;
 
   app.innerHTML = `
     <header class="brandbar">
@@ -404,28 +484,115 @@ async function renderHome() {
       <h1 class="wordmark">Maskemakker</h1>
       <button class="icon-btn on-brand" id="home-menu" aria-label="Menu">${dotsIcon}</button>
     </header>
-    <main class="home">
-      ${projects.length ? `
-        <div class="group-label">I gang · ${active.length}</div>
-        ${active.length ? `<div class="cards">${active.map(card).join('')}</div>` : '<div class="placeholder">Ingen projekter i gang</div>'}
-        <div class="group-label">Færdige · ${finished.length}</div>
-        ${finished.length ? `<div class="cards">${finished.map(card).join('')}</div>` : '<div class="placeholder">Færdige projekter samles her</div>'}
-      ` : `
-        <div class="empty">
-          <img class="empty-knot" src="icons/knot.png" alt="">
-          <h2>Ingen projekter endnu</h2>
-          <p>Importér en opskrift for at komme i gang.</p>
-          <button class="link-btn" id="example">Prøv med en eksempelopskrift</button>
-        </div>`}
+    <main class="home">${view === 'opskrifter' ? recipesView : projectsView}
+      <a class="home-foot" href="#/om">Om Maskemakker · Kontakt</a>
     </main>
-    <div class="dock"><button class="primary" id="import">＋ Importér opskrift</button></div>`;
+    <nav class="tabbar" aria-label="Forside">
+      <a href="#/" ${view === 'projekter' ? 'aria-current="page"' : ''}><span class="tb-ic">${needleIcon}</span>Projekter</a>
+      <a href="#/opskrifter" ${view === 'opskrifter' ? 'aria-current="page"' : ''}><span class="tb-ic">${bookOutline}</span>Opskrifter</a>
+    </nav>`;
 
-  app.querySelector('#import').onclick = pickFile;
-  app.querySelector('#example')?.addEventListener('click', loadExample);
+  app.querySelector('#start-new')?.addEventListener('click', () => openStartSheet(recipes, projects));
+  app.querySelector('#import-lib')?.addEventListener('click', () => pickFile('library'));
+  app.querySelectorAll('[data-start]').forEach((b) => b.onclick = () => startFromRecipe(recipes.find((r) => r.id === b.dataset.start)));
+  app.querySelectorAll('[data-more]').forEach((b) => b.onclick = () => recipeMenu(recipes.find((r) => r.id === b.dataset.more)));
   app.querySelector('#home-menu').onclick = () => openSheet('Maskemakker', [
-    { label: 'Importér opskrift', action: pickFile },
+    { label: 'Importér opskrift', action: () => pickFile('library') },
     { label: 'Gem backup af alle projekter', action: exportBackup },
     { label: 'Tilføj eksempelopskrift', action: loadExample },
+    { label: 'Om Maskemakker', action: () => go('#/om') },
+  ]);
+}
+
+/* ---------- about (MM-19) ---------- */
+
+function renderAbout() {
+  releaseWakeLock();
+  const year = new Date().getFullYear();
+  app.innerHTML = `
+    <header class="brandbar project">
+      <div class="proj-bar">
+        <a class="icon-btn on-brand" href="#/" aria-label="Tilbage">${backIcon}</a>
+        <div class="proj-title">Om Maskemakker</div>
+      </div>
+    </header>
+    <main class="about">
+      <img class="about-knot" src="icons/knot.png" alt="">
+      <p class="about-lead">Maskemakker holder styr på dine strikkeprojekter: hvilken pind du er nået til, tallene i den størrelse du strikker, og de projekter, du har gjort færdige.</p>
+
+      <section class="about-sec">
+        <h2>Ophavsret</h2>
+        <p>© ${year} Maskemakker. Alle rettigheder forbeholdes.</p>
+        <p>Strikkeopskrifter tilhører deres designere og er beskyttet af ophavsret. Opskrifter, du importerer, er kun til dit eget, private brug og må ikke deles eller sælges videre. Maskemakker indeholder og deler ingen opskrifter.</p>
+      </section>
+
+      <section class="about-sec">
+        <h2>Dine data</h2>
+        <p>Dine projekter, opskrifter og billeder gemmes kun på denne telefon. Tag en backup fra menuen (•••) på forsiden en gang imellem.</p>
+      </section>
+
+      <section class="about-sec">
+        <h2>Kontakt</h2>
+        <p>Har du spørgsmål, idéer eller har du fundet en fejl? Skriv gerne.</p>
+        <a class="primary brand about-mail" href="mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Maskemakker')}">${mailIcon}${CONTACT_EMAIL}</a>
+      </section>
+
+      <p class="about-version">Version ${APP_VERSION}</p>
+    </main>`;
+}
+
+/** Status of a recipe from the projects knitted from it. */
+function recipeStatus(r, projects) {
+  const mine = projects.filter((p) => p.recipeId === r.id);
+  if (mine.some((p) => !isFinished(p))) return { text: 'I gang nu', cls: 'now' };
+  const n = mine.filter(isFinished).length;
+  return n ? { text: `Strikket ${n} ${n === 1 ? 'gang' : 'gange'}`, cls: '' } : { text: 'Ikke strikket endnu', cls: '' };
+}
+
+/** The pattern photo, else your own photo of a project knitted from it. */
+function recipePhoto(r, projects) {
+  if (r.pattern.photo) return r.pattern.photo;
+  for (const p of projects) if (p.recipeId === r.id && photosOf(p).length) return photosOf(p)[0];
+  return null;
+}
+
+function recipeLine(r, projects) {
+  const pat = r.pattern;
+  const photo = recipePhoto(r, projects);
+  const st = recipeStatus(r, projects);
+  const designer = (pat.designer || '').split('·')[0].trim();
+  const sizes = pat.sizes.length === 1 ? 'Én størrelse' : `${pat.sizes.length} størrelser`;
+  return `
+    ${photo ? `<img class="rec-pic" src="${photo}" alt="">` : `<span class="rec-pic rec-empty"><img src="icons/knot.png" alt=""></span>`}
+    <span class="rec-text">
+      <span class="rec-title">${esc(pat.title)}</span>
+      <span class="rec-meta">${esc([designer, sizes].filter(Boolean).join(' · '))}</span>
+      <span class="rec-status ${st.cls}">${esc(st.text)}</span>
+    </span>`;
+}
+
+/** P34: the sheet from the "Start nyt projekt" card. */
+function openStartSheet(recipes, projects) {
+  openSheet('Start nyt projekt', [
+    { cls: 'import-row in-sheet', html: `${fileIcon}<span><b>Importér ny opskrift</b><span>Vælg en opskriftsfil på telefonen</span></span>`, action: () => pickFile('start') },
+    ...recipes.map((r) => ({ cls: 'sheet-rec', html: recipeLine(r, projects) + chevronRight, action: () => startFromRecipe(r) })),
+  ]);
+  if (recipes.length) sheet.querySelector('.import-row')?.insertAdjacentHTML('afterend', '<div class="sheet-sub">Eller vælg en af dine opskrifter</div>');
+  sheet.querySelector('.sheet-title')?.classList.add('big');
+}
+
+function recipeMenu(r) {
+  openSheet(r.pattern.title, [
+    { label: 'Start nyt projekt', action: () => startFromRecipe(r) },
+    {
+      label: 'Slet opskrift', cls: 'danger',
+      action: async () => {
+        if (!(await ask(`Slet "${r.pattern.title}" fra Opskrifter? Projekter, du har strikket efter den, bliver ikke slettet.`, 'Slet opskrift', true))) return;
+        await store.deleteRecipe(r.id);
+        toast('Opskriften er slettet');
+        route();
+      },
+    },
   ]);
 }
 
@@ -945,8 +1112,11 @@ function renderRecipe(body, project, techs) {
   body.querySelector('#finish')?.addEventListener('click', async () => {
     const pr = progress(project);
     const left = pr.total - pr.done;
-    if (left > 0 && !(await ask(`Der er ${left} ${left === 1 ? 'pind' : 'pinde'} uden flueben. Er projektet færdigt alligevel?`, 'Ja, jeg er færdig'))) return;
+    if (left > 0 && !(await ask(`Der er ${left} ${left === 1 ? 'pind' : 'pinde'} uden flueben. De bliver krydset af, når du markerer projektet som færdigt.`, 'Ja, jeg er færdig'))) return;
     const now = Date.now();
+    // Remember the ticks as they are now, so "Markér som i gang igen" can put them back.
+    project.autoDone = { done: { ...project.done }, reps: { ...(project.reps || {}) } };
+    tickAll(project, now);
     project.finished = true;
     project.finishedAt = now;
     project.secOpen = allSecs(project.pattern, false);   // MM-10: fold the whole recipe
@@ -957,16 +1127,17 @@ function renderRecipe(body, project, techs) {
   if (isFinished(project)) wireDoneCard(body, project);
   body.querySelector('#again')?.addEventListener('click', async () => {
     // New project with the same pattern; the finished one stays under "Færdige".
-    const copy = await createProject(normalizePattern(JSON.parse(JSON.stringify(project.pattern))));
+    const copy = await createProject(normalizePattern(JSON.parse(JSON.stringify(project.pattern))), project.recipeId || null);
     toast('Nyt projekt startet');
     go(`#/p/${copy.id}`);
   });
   body.querySelector('#unfinish')?.addEventListener('click', async () => {
     project.finished = false;
     delete project.finishedAt;
-    if (project.autoDone) {                        // untick the rows "Jeg er færdig!" ticked
-      for (const id of project.autoDone.rows) delete project.done[id];
-      project.reps = project.autoDone.reps;
+    if (project.autoDone) {                        // put the ticks back as they were before "Jeg er færdig!"
+      if (project.autoDone.done) project.done = project.autoDone.done;
+      else for (const id of project.autoDone.rows || []) delete project.done[id];   // older format
+      project.reps = project.autoDone.reps || {};
       delete project.autoDone;
     }
     await store.saveProject(project);
@@ -1051,6 +1222,16 @@ function yarnAmount(p) {
   }
   if (!any) return null;
   return allM ? { value: Math.round(m), unit: 'm garn' } : { value: Math.round(g), unit: 'g garn' };
+}
+
+/** Tick every row, and count fixed repeats as all knitted. */
+function tickAll(p, now) {
+  p.reps = p.reps || {};
+  for (const r of visibleRows(p)) {
+    const t = r.repeat ? repTimes(r.repeat, p.sizeIndex) : null;
+    if (t) p.reps[r.repeat.id] = Math.max(repsOf(p, r.repeat), t - 1);
+    if (!p.done[r.id]) p.done[r.id] = now;
+  }
 }
 
 function doneCard(p) {
@@ -1197,7 +1378,7 @@ function projectMenu(project, tab) {
     {
       label: 'Slet projekt', cls: 'danger',
       action: async () => {
-        if (!(await ask(`Slet "${project.pattern.title}"? Det kan ikke fortrydes.`, 'Slet projekt', true))) return;
+        if (!(await ask(`Slet projektet "${project.pattern.title}"? Det kan ikke fortrydes. Opskriften bliver i Opskrifter.`, 'Slet projekt', true))) return;
         await store.deleteProject(project.id);
         go('#/');
       },
@@ -1233,7 +1414,9 @@ function route() {
   window.__recipeScroll = null;
   const m = location.hash.match(/^#\/p\/([^/]+)(?:\/(\w+))?$/);
   window.scrollTo(0, 0);
-  return m ? renderProject(m[1], m[2]) : renderHome();
+  if (m) return renderProject(m[1], m[2]);
+  if (location.hash === '#/om') return renderAbout();
+  return renderHome(location.hash === '#/opskrifter' ? 'opskrifter' : 'projekter');
 }
 window.addEventListener('hashchange', route);
 
@@ -1256,6 +1439,12 @@ const plusIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 const cameraIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
 const needleIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 19L19 5M8 20l13-13"/></svg>';
 const closeIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+
+const fileIcon = '<svg class="file-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 12v6M9 15l3 3 3-3"/></svg>';
+const bookOutline = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h6a2 2 0 0 1 2 2v12a2 2 0 0 0-2-2H4z"/><path d="M20 5h-6a2 2 0 0 0-2 2v12a2 2 0 0 1 2-2h6z"/></svg>';
+const chevronRight = '<svg class="rec-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
+
+const mailIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>';
 
 /* ---------- start ---------- */
 
