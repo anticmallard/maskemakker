@@ -495,9 +495,8 @@ async function renderHome(view = 'projekter') {
       : '<div class="placeholder">Opskrifter, du importerer, samles her</div>'}`;
 
   app.innerHTML = `
-    <header class="brandbar">
-      <img class="brand-knot" src="icons/knot.png" alt="">
-      <h1 class="wordmark">Maskemakker</h1>
+    <header class="brandbar home-bar">
+      <h1 class="wordmark"><img src="icons/wordmark.png" alt="Maskemakker"></h1>
       <button class="icon-btn on-brand" id="home-menu" aria-label="Menu">${dotsIcon}</button>
     </header>
     <main class="home">${view === 'opskrifter' ? recipesView : projectsView}

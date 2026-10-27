@@ -102,5 +102,6 @@ Menu (•••) on the home screen → **Gem backup af alle projekter**. The ba
 - Section titles follow the pattern's own headlines, and text that isn't a row goes between the rows as `text` items.
 - `repeat` — a block of rows knitted over and over. Tick the rows, tap **Ny gentagelse**: ticks clear and the counter goes up. **−** steps the counter back. Ticking the `until` row ends the repeats.
 - Rows like "pind 2–4" are written out as three separate rows; "til arbejdet måler X cm" is one `measure` row.
+- Stay true to the pattern: keep its own units and wording. If it says "every 2 cm" or "the first buttonhole after 1 cm", write it in cm (a `measure` row, or a note listing the cm positions) — don't convert cm to rows. Use `rowMarks` only when the pattern itself gives row numbers.
 
 Changing a pattern file and re-importing creates a new project, because ticks are tied to row positions.

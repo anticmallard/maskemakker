@@ -110,11 +110,10 @@ a { color: inherit; }
   padding: calc(env(safe-area-inset-top) + 14px) 12px 18px 20px;
   display: flex; align-items: center; gap: 12px;
 }
-.brand-knot { width: 44px; height: 44px; object-fit: contain; flex: none; }
-.wordmark {
-  flex: 1; margin: 0; font: 700 28px/1.1 var(--serif);
-  color: var(--brand-ink); letter-spacing: -.3px;
-}
+.wordmark { flex: 1; margin: 0; line-height: 0; }
+.wordmark img { width: 230px; max-width: 100%; height: auto; display: block; }
+/* Home header: the logo lines up with the left edge of the cards below (16px) */
+.brandbar.home-bar { padding-left: 16px; padding-top: calc(env(safe-area-inset-top) + 18px); padding-bottom: 20px; }
 
 .brandbar.project { display: block; padding: calc(env(safe-area-inset-top) + 4px) 0 14px; }
 .proj-bar { display: flex; align-items: center; gap: 4px; padding: 0 6px; }
