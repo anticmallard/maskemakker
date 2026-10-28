@@ -922,3 +922,4 @@ body.no-scroll { overflow: hidden; }
 .my-field .g-unit { font-size: inherit; font-weight: 400; color: inherit; }
 .my-field .g-unit em { font-size: 13px; }
 .my-field .g-ratio > span { font-size: 16px; font-weight: 400; color: var(--ink); }
+.g-chip.far { background: var(--plum-soft); color: var(--plum); }

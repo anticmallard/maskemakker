@@ -70,7 +70,7 @@ function fibreShort(y) {
   return n.length <= 3 ? `${n.slice(0, -1).join(', ')} og ${n[n.length - 1]}` : `${n.slice(0, 2).join(', ')} …`;
 }
 const brandShort = (b) => (b === 'Sandnes Garn' ? 'Sandnes' : b);
-const chip = (r) => `<span class="g-chip ${r}">${G.RATING[r] || 'Opskriftens garn'}</span>`;
+const chip = (r) => `<span class="g-chip ${r}">${r === 'far' ? 'Langt fra' : G.RATING[r] || 'Opskriftens garn'}</span>`;
 const tag = (t, cls = '') => `<span class="g-tag ${cls}">${esc(t)}</span>`;
 
 /** Info about a yarn reference, catalogue or your own. */
@@ -505,13 +505,13 @@ async function renderAlternative(project = null) {
   const metres = metresOf(i, a.amount, a.unit);
   // Single yarns first. Two strands held together get their own section, shown only when
   // a combination is a good match ("Meget tæt på" or "Godt alternativ").
-  // The yarn you just added to the garnkatalog from here comes first, however well it fits
+  // The yarn you chose (or added) via "Kan du ikke finde dit garn?" comes first, however well it fits
   const added = i && a.added && G.byId(a.added) && !sameRef({ id: a.added }, a.ref) ? G.byId(a.added) : null;
   const addedCard = added ? (G.rateYarn(added.id, G.targetOf(a.ref))
-    || { yarns: [added], sts: added.thick, m50: added.m50, structure: added.structure, rating: 'try', why: [`Ligger langt fra ${i.name} i tykkelse`] }) : null;
+    || { yarns: [added], sts: added.thick, m50: added.m50, structure: added.structure, rating: 'far', why: [`Ligger langt fra ${i.name} i tykkelse. Strik en prøve, og regn med at skulle tilpasse opskriften`] }) : null;
   const res = i ? G.alternatives(G.targetOf(a.ref), { limit: 8 }).filter((c) => !added || c.yarns[0].id !== added.id) : [];
   const pairs = i ? G.alternatives(G.targetOf(a.ref), { limit: 60, withCombos: true }).filter((c) => c.yarns.length > 1 && c.rating !== 'try').slice(0, 5) : [];
-  const listHtml = (m) => `${addedCard ? `<div class="g-band">Dit nye garn</div>${resultCard(addedCard, m, i.name, !!project)}<div class="g-band">Forslag fra garnkataloget</div>` : ''}${res.length ? res.map((c) => resultCard(c, m, i.name, !!project)).join('') : (pairs.length ? '' : '<div class="placeholder">Ingen garner i garnkataloget ligger tæt nok på.</div>')}
+  const listHtml = (m) => `${addedCard ? `<div class="g-band">Dit valgte garn</div>${resultCard(addedCard, m, i.name, !!project)}<div class="g-band">Forslag fra garnkataloget</div>` : ''}${res.length ? res.map((c) => resultCard(c, m, i.name, !!project)).join('') : (pairs.length ? '' : '<div class="placeholder">Ingen garner i garnkataloget ligger tæt nok på.</div>')}
     ${pairs.length ? `<div class="g-band">Med to tråde holdt sammen</div>${pairs.map((c) => resultCard(c, m, i.name, !!project)).join('')}` : ''}`;
   const units = ['g', 'm', ...(i?.skein ? ['nøgler'] : [])];
   app.innerHTML = `
@@ -534,7 +534,7 @@ async function renderAlternative(project = null) {
       </div>
       ${res.length && !addedCard ? `<div class="g-toolbar"><span>${res.length} forslag · tættest først</span></div>` : ''}
       <div class="g-results" id="alt-res">${listHtml(metres)}</div>
-      <button class="import-row g-addrow" data-act="add-own">${I.plus}<span><b>Kan du ikke finde dit garn?</b><span>Tilføj det til garnkataloget</span></span></button>
+      <button class="import-row g-addrow" data-act="pick-own">${I.search}<span><b>Kan du ikke finde dit garn?</b><span>Søg i hele garnkataloget, eller tilføj det</span></span></button>
       <p class="g-small">Forslagene er en vejledning. Strik altid en strikkeprøve.</p>` : '<p class="g-small">Vælg garnet fra opskriften, så finder Maskemakker garner med samme tykkelse.</p>'}
     </main>`;
   wireCommon(app);
@@ -543,7 +543,14 @@ async function renderAlternative(project = null) {
     if (ref) { a.ref = ref; a.added = null; if (a.unit === 'nøgler' && !info(ref).skein) a.unit = 'g'; renderAlternative(); }
   });
   if (!i) return;
-  app.querySelector('[data-act="add-own"]').onclick = () => { S.add.back = true; C.go('#/garn/nyt'); };
+  // Any yarn in the garnkatalog (or a new one) can be chosen, however far it is from the pattern's yarn
+  app.querySelector('[data-act="pick-own"]').onclick = async () => {
+    const ref = await pickYarn({ title: 'Vælg dit garn', ownList: list.filter((e) => e.ref.id) });
+    if (!ref?.id) return;
+    a.added = ref.id;
+    await renderAlternative(project);
+    app.querySelector('.g-results')?.scrollIntoView({ block: 'start' });
+  };
   // Yarn that isn't in the catalogue: choose its fibre right here (tap again to clear)
   app.querySelectorAll('[data-setfib]').forEach((b) => (b.onclick = () => {
     const f = b.dataset.setfib;
