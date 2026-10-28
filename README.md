@@ -9,6 +9,9 @@ A home-screen web app for iPhone. Progress is saved on the phone only.
 | `index.html` | The page itself |
 | `app.js` | Screens, tabs, ticking rows, size switching, import |
 | `storage.js` | **The only file that saves data.** In version 2 we swap its insides for a database |
+| `garn.js` | Garnvælger: loads the yarn catalogue and finds alternatives (no screens) |
+| `garn-ui.js` | Garnvælger screens: the Garn tab, catalogue, a yarn's page, Find alternativ, Sammenlign, To garner sammen, Hvad kan jeg strikke? |
+| `yarns.json` | The yarn catalogue (Drops and Sandnes Garn). Facts only, safe to upload to GitHub |
 | `style.css` | Look and feel (light and dark mode) |
 | `sw.js` | Makes the app open without internet |
 | `manifest.json`, `icons/` | Home-screen name, app icon and the knot logo |
@@ -42,6 +45,15 @@ Every imported pattern stays under **Opskrifter**, so you can start a new projec
 ## About page and contact email
 
 The **Om Maskemakker** page (in the ••• menu on the home screen) shows copyright info, a note that patterns belong to their designers, and a contact email. The email and version are set at the top of `app.js`: `CONTACT_EMAIL` and `APP_VERSION`.
+
+## Garnvælger (the Garn tab)
+
+The third tab finds yarn alternatives. It uses `yarns.json`, a catalogue of yarn facts (metres per 50 g, fibre, gauge, needle, type) collected from the brands' own pages. Unlike pattern files, this is our own list of facts, so it can go on GitHub.
+
+- **Matching:** smooth yarns are compared by metres per 50 g (the same for every brand); airy, brushed, bouclé and mohair yarns by their own gauge. Fibre and type count too. Two strands held together are worked out as one thicker yarn.
+- **Your patterns:** a pattern's yarn is linked to the catalogue when its name is written "Navn fra Mærke", e.g. "Sunday fra Sandnes Garn". Yarns that aren't in the catalogue still work when the text gives the metres, e.g. "(50 g = 175 m)".
+- **From a project:** on Materialer, "Find et alternativ til …" opens Find alternativ with the pattern's yarn and the metres for your size filled in. "Brug dette garn" saves the choice as "Dit garn".
+- **Adding a yarn or brand:** add entries to `yarns` in `yarns.json` with the same fields (`id`, `brand`, `name`, `fibre`, `m50`, `skein`, `sts`, `needle`, `structure`, `url`), add the brand under `brands`, and update `updated`.
 
 ## Backup
 

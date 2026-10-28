@@ -1,5 +1,6 @@
 // app.js — Maskemakker: screens and interaction. All saving goes through storage.js.
 import * as store from './storage.js';
+import * as GU from './garn-ui.js';
 
 const app = document.getElementById('app');
 const fileInput = document.getElementById('file-input');
@@ -7,7 +8,7 @@ const photoInput = document.getElementById('photo-input');
 const sheet = document.getElementById('sheet');
 
 const TABS = ['materialer', 'teknikker', 'opskrift'];
-const APP_VERSION = '27. oktober 2026';
+const APP_VERSION = '28. oktober 2026';
 const CONTACT_EMAIL = 'contact@maskemakker.com';   // MM-20: replace with the real address
 
 /* ---------- helpers ---------- */
@@ -495,26 +496,38 @@ async function renderHome(view = 'projekter') {
       : '<div class="placeholder">Opskrifter, du importerer, samles her</div>'}`;
 
   app.innerHTML = `
-    <header class="brandbar home-bar">
-      <h1 class="wordmark"><img src="icons/wordmark.png" alt="Maskemakker"></h1>
-      <button class="icon-btn on-brand" id="home-menu" aria-label="Menu">${dotsIcon}</button>
-    </header>
+    ${homeHeader()}
     <main class="home">${view === 'opskrifter' ? recipesView : projectsView}
     </main>
-    <nav class="tabbar" aria-label="Forside">
-      <a href="#/" ${view === 'projekter' ? 'aria-current="page"' : ''}><span class="tb-ic">${needleIcon}</span>Projekter</a>
-      <a href="#/opskrifter" ${view === 'opskrifter' ? 'aria-current="page"' : ''}><span class="tb-ic">${bookOutline}</span>Opskrifter</a>
-    </nav>`;
+    ${tabbar(view)}`;
 
   app.querySelector('#start-new')?.addEventListener('click', () => openStartSheet(recipes, projects));
   app.querySelector('#import-lib')?.addEventListener('click', () => pickFile('library'));
   app.querySelectorAll('[data-start]').forEach((b) => b.onclick = () => startFromRecipe(recipes.find((r) => r.id === b.dataset.start)));
   app.querySelectorAll('[data-more]').forEach((b) => b.onclick = () => recipeMenu(recipes.find((r) => r.id === b.dataset.more)));
+  wireHomeHeader();
+}
+
+/** The green header on the three front-page tabs, with the logo and the ••• menu. */
+const homeHeader = () => `
+    <header class="brandbar home-bar">
+      <h1 class="wordmark"><img src="icons/wordmark.png" alt="Maskemakker"></h1>
+      <button class="icon-btn on-brand" id="home-menu" aria-label="Menu">${dotsIcon}</button>
+    </header>`;
+function wireHomeHeader() {
   app.querySelector('#home-menu').onclick = () => openSheet('Maskemakker', [
     { label: 'Gem backup af alle projekter', action: exportBackup },
     { label: 'Tilføj eksempelopskrift', action: loadExample },
     { label: 'Om Maskemakker', action: () => go('#/om') },
   ]);
+}
+
+/** Bottom menu: Projekter, Opskrifter, Garn. */
+function tabbar(view) {
+  const t = (href, key, icon, label) => `<a href="${href}" ${view === key ? 'aria-current="page"' : ''}><span class="tb-ic">${icon}</span>${label}</a>`;
+  return `<nav class="tabbar" aria-label="Forside">
+      ${t('#/', 'projekter', needleIcon, 'Projekter')}${t('#/opskrifter', 'opskrifter', bookOutline, 'Opskrifter')}${t('#/garn', 'garn', yarnIcon.replace('class="tile-ic" ', ''), 'Garn')}
+    </nav>`;
 }
 
 /* ---------- about (MM-19) ---------- */
@@ -634,7 +647,6 @@ async function renderProject(id, tab) {
   const si = project.sizeIndex;
   const techs = techMap(pat);
   const pr = progress(project);
-  const photo = photoOf(project);
   const nTech = (pat.techniques || []).length;
 
   const tile = (key, label, icon, sub) => `
@@ -646,7 +658,7 @@ async function renderProject(id, tab) {
     <header class="brandbar project">
       <div class="proj-bar">
         <a class="icon-btn on-brand" href="#/" aria-label="Tilbage">${backIcon}</a>
-        ${photo ? `<img class="proj-thumb" src="${photo}" alt="">` : `<span class="proj-thumb empty"><img src="icons/knot.png" alt=""></span>`}
+        ${photoOf(project) ? `<img class="proj-thumb" src="${photoOf(project)}" alt="">` : ''}
         <div class="proj-title">${esc(pat.title)}</div>
         <button class="icon-btn on-brand" id="proj-menu" aria-label="Menu">${dotsIcon}</button>
       </div>
@@ -724,6 +736,34 @@ function renderMaterials(body, project, prev = null) {
   const materials = !pat.yarn && !pat.needles ? (pat.materials || []).map((m) => `
     <div class="list-row">${renderText(m.text, si)}</div>`).join('') : '';
 
+  // MM-14: "Dit garn" – the yarn you actually use, if it differs from the pattern's
+  project.myYarns = project.myYarns || [];
+  const field = (i, key, label, attrs = '') => `
+    <label class="my-field"><span>${label}</span><input data-my="${i}" data-key="${key}" value="${esc(project.myYarns[i][key] || '')}" autocomplete="off" ${attrs}></label>`;
+  const myYarnHtml = `
+    ${project.myYarns.map((y, i) => {
+      const more = ['material', 'metersPer50'].some((k) => (y[k] || '').toString().trim());
+      return `
+      <div class="my-yarn panel">
+        <div class="my-yarn-head"><b>${project.myYarns.length > 1 ? `Dit garn ${i + 1}` : 'Dit garn'}</b>
+          <button class="link-btn" data-my-del="${i}">Fjern</button></div>
+        <div class="my-grid">
+          ${field(i, 'brand', 'Mærke', 'placeholder="Fx Sandnes Garn"')}
+          ${field(i, 'name', 'Garn', 'placeholder="Fx Double Sunday"')}
+        </div>
+        ${field(i, 'color', 'Farve', 'placeholder="Navn eller nummer"')}
+        <details class="my-more" ${more ? 'open' : ''}>
+          <summary>Flere detaljer</summary>
+          <div class="my-grid">
+            ${field(i, 'material', 'Materiale', 'placeholder="Fx 100 % merino"')}
+            ${field(i, 'metersPer50', 'Løbelængde (m pr. 50 g)', 'inputmode="decimal" placeholder="Fx 108"')}
+          </div>
+        </details>
+      </div>`;
+    }).join('')}
+    <button class="pill my-add" id="my-add">${plusIcon}${project.myYarns.length ? 'Tilføj et garn mere' : 'Jeg bruger et andet garn'}</button>
+    ${project.myYarns.length ? '<p class="hint">Opskriften ændrer sig ikke. Dit garn vises på projektkortet, når du er færdig.</p>' : ''}`;
+
   // Yarn: when the pattern suggests several, you pick the one you use
   const yarnOpts = pat.yarn || [];
   const yarnHtml = yarnOpts.length > 1 ? `
@@ -736,6 +776,17 @@ function renderMaterials(body, project, prev = null) {
         </button>`).join('')}
     </div>` : yarnOpts.length === 1 ? `
     <div class="panel"><div class="list-row"><b>${esc(yarnOpts[0].name)}</b>${yarnOpts[0].text ? `<br>${renderText(yarnOpts[0].text, si)}` : ''}</div></div>` : '';
+
+  // With your own yarn, "Dit garn" comes first and the pattern's yarns are only shown as information,
+  // with the one you replaced marked, so the pattern's yarn no longer looks chosen.
+  const hasOwn = ownYarns(project).length > 0;
+  const replacedIdx = yarnOpts.length > 1 ? project.yarnChoice ?? null : 0;
+  const patternYarnInfo = yarnOpts.length ? `
+    <p class="hint top">${yarnOpts.length > 1 ? 'Opskriften foreslår:' : 'Opskriftens garn:'}</p>
+    <div class="panel pat-yarns">${yarnOpts.map((y, i) => `
+      <div class="list-row"><span class="pat-yarn-name"><b>${esc(y.name)}</b>${i === replacedIdx ? '<span class="replaced-tag">Erstattet</span>' : ''}</span>${y.text ? `<span class="pat-yarn-text">${renderText(y.text, si)}</span>` : ''}</div>`).join('')}
+    </div>` : '';
+  const findPill = yarnOpts.length ? `<button class="pill my-find" id="find-alt">${searchIcon}${hasOwn ? 'Find et andet alternativ' : `Find et alternativ til ${esc(patternYarns(project)[0].name.split(/\s+fra\s+/i)[0])}`}</button>` : '';
 
   // Needles: the pattern's needle stays visible; you can record that you use another size
   project.needles = project.needles || {};
@@ -805,7 +856,8 @@ function renderMaterials(body, project, prev = null) {
         ${hint ? `<p class="hint">${hint}</p>` : ''}
         ${sizeInfo}` : ''}
       ${materials ? `<h3 class="block-title">Garn og pinde</h3><div class="panel">${materials}</div>` : ''}
-      ${yarnHtml ? `<h3 class="block-title">Garn</h3>${yarnHtml}` : ''}
+      <h3 class="block-title">Garn</h3>
+      ${hasOwn ? `<div class="my-yarns">${myYarnHtml}</div>${patternYarnInfo}${findPill}` : `${yarnHtml}${findPill}<div class="my-yarns">${myYarnHtml}</div>`}
       ${(pat.notions || []).length ? `<h3 class="block-title">Tilbehør</h3><div class="panel">${pat.notions.map((n) => `<div class="list-row">${renderText(n.text, si)}</div>`).join('')}</div>` : ''}
       ${needleHtml ? `<h3 class="block-title">Pinde</h3><div class="panel">${needleHtml}</div>
         ${anyNeedleChanged ? '<p class="hint">Opskriften ændrer sig ikke, når du bruger en anden pind. Tjek gerne strikkefastheden.</p>' : ''}` : ''}
@@ -852,6 +904,33 @@ function renderMaterials(body, project, prev = null) {
     await renderProject(project.id, 'materialer');
     window.scrollTo(0, y);
   });
+  // "Dit garn": typing saves quietly; adding or removing redraws
+  let myT = 0;
+  body.querySelectorAll('[data-my]').forEach((inp) => inp.addEventListener('input', () => {
+    project.myYarns[+inp.dataset.my][inp.dataset.key] = inp.value;
+    clearTimeout(myT); myT = setTimeout(() => store.saveProject(project), 400);
+  }));
+  const redrawMaterials = async (focusIdx) => {
+    const y = window.scrollY;
+    await store.saveProject(project);
+    await renderProject(project.id, 'materialer');
+    window.scrollTo(0, y);
+    if (focusIdx != null) app.querySelector(`[data-my="${focusIdx}"][data-key="brand"]`)?.focus();
+  };
+  // Scenario B: the Garnvælger with this pattern's yarn and size filled in
+  body.querySelector('#find-alt')?.addEventListener('click', () => go(`#/garn/til/${project.id}`));
+  body.querySelector('#my-add')?.addEventListener('click', () => {
+    project.myYarns.push({});
+    redrawMaterials(project.myYarns.length - 1);
+  });
+  body.querySelectorAll('[data-my-del]').forEach((b) => b.onclick = async () => {
+    const i = +b.dataset.myDel;
+    const y = project.myYarns[i];
+    if (Object.values(y).some((v) => String(v).trim()) && !(await ask('Fjern dette garn?', 'Fjern garn', true))) return;
+    project.myYarns.splice(i, 1);
+    redrawMaterials();
+  });
+
   body.querySelectorAll('[data-needle]').forEach((sel) => sel.onchange = async () => {
     const i = sel.dataset.needle;
     const orig = plain((pat.needles[i] || {}).size || '', si);
@@ -1283,8 +1362,24 @@ function rowsKnitted(p) {
   return n;
 }
 
-/** The yarn(s) you knit with: your choice when the pattern suggests several. */
+/** MM-14: yarn you registered yourself under Materialer ("Dit garn"). */
+const ownYarns = (p) => (p.myYarns || []).filter((y) => (y.name || '').trim() || (y.brand || '').trim());
+/** "Double Sunday fra Sandnes Garn i farven Lysegrøn" */
+function yarnLabel(y) {
+  const name = (y.name || '').trim(), brand = (y.brand || '').trim(), color = (y.color || '').trim();
+  const base = name && brand ? `${name} fra ${brand}` : name || brand;
+  return color ? `${base} i farven ${color}` : base;
+}
+
+/** The yarn(s) you knit with: your own yarn if you registered one, else the pattern's (your choice when it suggests several). */
 function yarnsUsed(p) {
+  const own = ownYarns(p);
+  if (own.length) return own.map((y) => ({ name: yarnLabel(y), own: y }));
+  return patternYarns(p);
+}
+
+/** The pattern's yarn: your choice when it suggests several. */
+function patternYarns(p) {
   const ys = p.pattern.yarn || [];
   if (ys.length > 1 && p.yarnChoice != null && ys[p.yarnChoice]) return [ys[p.yarnChoice]];
   return ys.slice(0, 1);
@@ -1296,9 +1391,12 @@ function yarnsUsed(p) {
  * Without metres per skein it falls back to grams; ranges ("350-400 g") use the middle.
  */
 function yarnAmount(p) {
+  // With your own yarn: show the metres the pattern calls for (the metres needed barely change
+  // with another yarn), but never the pattern's grams, which wouldn't fit your yarn.
+  const own = ownYarns(p).length > 0;
   let m = 0, g = 0, allM = true, any = false;
   const num = (x) => { const [a, b] = x.split('-').map((v) => parseFloat(v.replace(',', '.'))); return b ? (a + b) / 2 : a; };
-  for (const y of yarnsUsed(p)) {
+  for (const y of patternYarns(p)) {
     let t = plain(y.text || '', p.sizeIndex);
     let ratio = null;
     const r1 = t.match(/(\d+)\s*g\s*=\s*(\d+)\s*m/), r2 = t.match(/(\d+)\s*m\s*(?:pr\.?|per|\/)\s*(\d+)\s*g/);
@@ -1311,7 +1409,7 @@ function yarnAmount(p) {
     any = true; g += gr;
     if (ratio) m += (gr / ratio.g) * ratio.m; else allM = false;
   }
-  if (!any) return null;
+  if (!any || (own && !allM)) return null;
   return allM ? { value: Math.round(m), unit: 'm garn' } : { value: Math.round(g), unit: 'g garn' };
 }
 
@@ -1512,6 +1610,8 @@ function route() {
   window.scrollTo(0, 0);
   if (m) return renderProject(m[1], m[2]);
   if (location.hash === '#/om') return renderAbout();
+  const garn = GU.route(location.hash);
+  if (garn) return garn;
   return renderHome(location.hash === '#/opskrifter' ? 'opskrifter' : 'projekter');
 }
 window.addEventListener('hashchange', route);
@@ -1540,9 +1640,26 @@ const fileIcon = '<svg class="file-ic" viewBox="0 0 24 24" fill="none" stroke="c
 const bookOutline = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h6a2 2 0 0 1 2 2v12a2 2 0 0 0-2-2H4z"/><path d="M20 5h-6a2 2 0 0 0-2 2v12a2 2 0 0 1 2-2h6z"/></svg>';
 const chevronRight = '<svg class="rec-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
 
+const searchIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4-4"/></svg>';
 const mailIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>';
 
 /* ---------- start ---------- */
+
+// The Garnvælger (garn-ui.js) borrows these from here.
+GU.init({
+  app, store, esc, go, toast, openSheet, daDate, isFinished, yarnAmount, patternYarns, ownYarns, releaseWakeLock,
+  tabbar, homeHeader, wireHomeHeader,
+  icons: { back: backIcon, chevronRight, check: checkIcon },
+  recipeThumb: (r) => (r.pattern.photo ? `<img class="rec-pic" src="${r.pattern.photo}" alt="">` : '<span class="rec-pic rec-empty"><img src="icons/knot.png" alt=""></span>'),
+  projectThumb: (p) => { const ph = photosOf(p)[0] || p.pattern.photo; return ph ? `<img class="rec-pic" src="${ph}" alt="">` : '<span class="rec-pic rec-empty"><img src="icons/knot.png" alt=""></span>'; },
+  /** "Størrelse 3-6 mdr. på 3 mm pinde. Den blev lidt lille." */
+  knitSentence: (p) => {
+    const size = p.sizeIndex != null && p.pattern.sizes.length > 1 ? `Størrelse ${p.pattern.sizes[p.sizeIndex]}` : '';
+    const needles = needleSizesOf(p).join(' og ');
+    const first = [size, needles && `${size ? 'på' : 'På'} ${needles} pinde`].filter(Boolean).join(' ');
+    return [first && (first.endsWith('.') ? first : `${first}.`), p.fit != null && `Den ${FIT_PHRASE[p.fit]}.`].filter(Boolean).join(' ') || 'Færdig';
+  },
+});
 
 route();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});

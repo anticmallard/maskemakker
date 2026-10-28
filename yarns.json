@@ -1,0 +1,1966 @@
+{
+ "version": 1,
+ "updated": "2026-10-28",
+ "about": "Garnfakta samlet fra mærkernes egne sider: garnstudio.com (DROPS garngrupper) og sandnes-garn.com (hvert garns side). Strikkefasthed er garnets egen anbefaling i glatstrik på 10 cm.",
+ "brands": {
+  "Drops": "https://www.garnstudio.com",
+  "Sandnes Garn": "https://www.sandnes-garn.com"
+ },
+ "dropsGroups": {
+  "A": [
+   23,
+   26
+  ],
+  "B": [
+   20,
+   22
+  ],
+  "C": [
+   16,
+   19
+  ],
+  "D": [
+   12,
+   15
+  ],
+  "E": [
+   9,
+   11
+  ],
+  "F": [
+   5,
+   8
+  ]
+ },
+ "yarns": [
+  {
+   "id": "drops-alpaca",
+   "brand": "Drops",
+   "name": "Alpaca",
+   "fibre": [
+    {
+     "pct": 100,
+     "fibre": "alpaka"
+    }
+   ],
+   "m50": 167,
+   "skein": {
+    "g": 50,
+    "m": 167
+   },
+   "sts": [
+    24,
+    24
+   ],
+   "rows": 32,
+   "needle": [
+    3,
+    3
+   ],
+   "structure": "glat",
+   "group": "A",
+   "url": "https://www.garnstudio.com/yarn-groups.php"
+  },
+  {
+   "id": "drops-baby-merino",
+   "brand": "Drops",
+   "name": "Baby Merino",
+   "fibre": [
+    {
+     "pct": 100,
+     "fibre": "merino"
+    }
+   ],
+   "m50": 175,
+   "skein": {
+    "g": 50,
+    "m": 175
+   },
+   "sts": [
+    24,
+    24
+   ],
+   "rows": 32,
+   "needle": [
+    3,
+    3
+   ],
+   "structure": "glat",
+   "group": "A",
+   "url": "https://www.garnstudio.com/yarn-groups.php"
+  },
+  {
+   "id": "drops-fabel",
+   "brand": "Drops",
+   "name": "Fabel",
+   "fibre": [
+    {
+     "pct": 75,
+     "fibre": "uld"
+    },
+    {
+     "pct": 25,
+     "fibre": "polyamid"
+    }
+   ],
+   "m50": 205,
+   "skein": {
+    "g": 50,
+    "m": 205
+   },
+   "sts": [
+    24,
+    24
+   ],
+   "rows": 32,
+   "needle": [
+    3,
+    3
+   ],
+   "structure": "glat",
+   "group": "A",
+   "url": "https://www.garnstudio.com/yarn-groups.php"
+  },
+  {
+   "id": "drops-flora",
+   "brand": "Drops",
+   "name": "Flora",
+   "fibre": [
+    {
+     "pct": 65,
+     "fibre": "uld"
+    },
+    {
+     "pct": 35,
+     "fibre": "alpaka"
+    }
+   ],
+   "m50": 210,
+   "skein": {
+    "g": 50,
+    "m": 210
+   },
+   "sts": [
+    24,
+    24
+   ],
+   "rows": 32,
+   "needle": [
+    3,
+    3
+   ],
+   "structure": "glat",
+   "group": "A",
+   "url": "https://www.garnstudio.com/yarn-groups.php"
+  },
+  {
+   "id": "drops-kid-silk",
+   "brand": "Drops",
+   "name": "Kid-Silk",
+   "fibre": [
+    {
+     "pct": 75,
+     "fibre": "mohair"
+    },
+    {
+     "pct": 25,
+     "fibre": "silke"
+    }
+   ],
+   "m50": 420,
+   "skein": {
+    "g": 25,
+    "m": 210
+   },
+   "sts": [
+    23,
+    23
+   ],
+   "rows": 30,
+   "needle": [
+    3.5,
+    3.5
+   ],
+   "structure": "mohair",
+   "group": "A",
+   "url": "https://www.garnstudio.com/yarn-groups.php"
+  },
+  {
+   "id": "drops-loves-you-7",
+   "brand": "Drops",
+   "name": "Loves You 7",
+   "fibre": [
+    {
+     "pct": 100,
+     "fibre": "bomuld"
+    }
+   ],
+   "m50": 170,
+   "skein": {
+    "g": 50,
+    "m": 170
+   },
+   "sts": [
+    23,
+    23
+   ],
+   "rows": 30,
+   "needle": [
+    3.5,
+    3.5
+   ],
+   "structure": "glat",
+   "group": "A",
+   "url": "https://www.garnstudio.com/yarn-groups.php"
+  },
+  {
+   "id": "drops-loves-you-9",
+   "brand": "Drops",
+   "name": "Loves You 9",
+   "fibre": [
+    {
+     "pct": 100,
+     "fibre": "bomuld"
+    }
+   ],
+   "m50": 125,
+   "skein": {
+    "g": 50,
+    "m": 125
+   },
+   "sts": [
+    24,
+    24
+   ],
+   "rows": 32,
+   "needle": [
+    3,
+    3
+   ],
+   "structure": "glat",
+   "group": "A",
+   "url": "https://www.garnstudio.com/yarn-groups.php"
+  },
+  {
+   "id": "drops-nord",
+   "brand": "Drops",
+   "name": "Nord",
+   "fibre": [
+    {
+     "pct": 45,
+     "fibre": "alpaka"
+    },
+    {
+     "pct": 30,
+     "fibre": "polyamid"
+    },
+    {
+     "pct": 25,
+     "fibre": "uld"
+    }
+   ],
+   "m50": 170,
+   "skein": {
+    "g": 50,
+    "m": 170
+   },
+   "sts": [
+    24,
+    24
+   ],
+   "rows": 32,
+   "needle": [
+    3,
+    3
+   ],
+   "structure": "luftig",
+   "group": "A",
+   "url": "https://www.garnstudio.com/yarn-groups.php"
+  },
+  {
+   "id": "drops-safran",
+   "brand": "Drops",
+   "name": "Safran",
+   "fibre": [
+    {
+     "pct": 100,
+     "fibre": "bomuld"
+    }
+   ],
+   "m50": 160,
+   "skein": {
+    "g": 50,
+    "m": 160
+   },
+   "sts": [
+    24,
+    24
+   ],
+   "rows": 32,
+   "needle": [
+    3,
+    3
+   ],
+   "structure": "glat",
+   "group": "A",
+   "url": "https://www.garnstudio.com/yarn-groups.php"
+  },
+  {
+   "id": "drops-belle",
+   "brand": "Drops",
+   "name": "Belle",
+   "fibre": [
+    {
+     "pct": 53,
+     "fibre": "bomuld"
+    },
+    {
+     "pct": 33,
+     "fibre": "viskose"
+    },
+    {
+     "pct": 14,
+     "fibre": "hør"
+    }
+   ],
+   "m50": 120,
+   "skein": {
+    "g": 50,
+    "m": 120
+   },
+   "sts": [
+    21,
+    21
+   ],
+   "rows": 28,
+   "needle": [
+    4,
+    4
+   ],
+   "structure": "glat",
+   "group": "B",
+   "url": "https://www.garnstudio.com/yarn-groups.php"
+  },
+  {
+   "id": "drops-cotton-light",
+   "brand": "Drops",
+   "name": "Cotton Light",
+   "fibre": [
+    {
+     "pct": 50,
+     "fibre": "bomuld"
+    },
+    {
+     "pct": 50,
+     "fibre": "polyester"
+    }
+   ],
+   "m50": 105,
+   "skein": {
+    "g": 50,
+    "m": 105
+   },
+   "sts": [
+    21,
+    21
+   ],
+   "rows": 28,
+   "needle": [
+    4,
+    4
+   ],
+   "structure": "glat",
+   "group": "B",
+   "url": "https://www.garnstudio.com/yarn-groups.php"
+  },
+  {
+   "id": "drops-cotton-merino",
+   "brand": "Drops",
+   "name": "Cotton Merino",
+   "fibre": [
+    {
+     "pct": 50,
+     "fibre": "merino"
+    },
+    {
+     "pct": 50,
+     "fibre": "bomuld"
+    }
+   ],
+   "m50": 110,
+   "skein": {
+    "g": 50,
+    "m": 110
+   },
+   "sts": [
+    21,
+    21
+   ],
+   "rows": 28,
+   "needle": [
+    4,
+    4
+   ],
+   "structure": "glat",
+   "group": "B",
+   "url": "https://www.garnstudio.com/yarn-groups.php"
+  },
+  {
+   "id": "drops-daisy",
+   "brand": "Drops",
+   "name": "Daisy",
+   "fibre": [
+    {
+     "pct": 100,
+     "fibre": "uld"
+    }
+   ],
+   "m50": 110,
+   "skein": {
+    "g": 50,
+    "m": 110
+   },
+   "sts": [
+    21,
+    21
+   ],
+   "rows": 28,
+   "needle": [
+    4,
+    4
+   ],
+   "structure": "glat",
+   "group": "B",
+   "url": "https://www.garnstudio.com/yarn-groups.php"
+  },
+  {
+   "id": "drops-fiesta",
+   "brand": "Drops",
+   "name": "Fiesta",
+   "fibre": [
+    {
+     "pct": 75,
+     "fibre": "uld"
+    },
+    {
+     "pct": 25,
+     "fibre": "polyamid"
+    }
+   ],
+   "m50": 110,
+   "skein": {
+    "g": 50,
+    "m": 110
+   },
+   "sts": [
+    21,
+    21
+   ],
+   "rows": 28,
+   "needle": [
+    4,
+    4
+   ],
+   "structure": "glat",
+   "group": "B",
+   "url": "https://www.garnstudio.com/yarn-groups.php"
+  },
+  {
+   "id": "drops-karisma",
+   "brand": "Drops",
+   "name": "Karisma",
+   "fibre": [
+    {
+     "pct": 100,
+     "fibre": "uld"
+    }
+   ],
+   "m50": 100,
+   "skein": {
+    "g": 50,
+    "m": 100
+   },
+   "sts": [
+    21,
+    21
+   ],
+   "rows": 28,
+   "needle": [
+    4,
+    4
+   ],
+   "structure": "glat",
+   "group": "B",
+   "url": "https://www.garnstudio.com/yarn-groups.php"
+  },
+  {
+   "id": "drops-lima",
+   "brand": "Drops",
+   "name": "Lima",
+   "fibre": [
+    {
+     "pct": 65,
+     "fibre": "uld"
+    },
+    {
+     "pct": 35,
+     "fibre": "alpaka"
+    }
+   ],
+   "m50": 100,
+   "skein": {
+    "g": 50,
+    "m": 100
+   },
+   "sts": [
+    21,
+    21
+   ],
+   "rows": 28,
+   "needle": [
+    4,
+    4
+   ],
+   "structure": "glat",
+   "group": "B",
+   "url": "https://www.garnstudio.com/yarn-groups.php"
+  },
+  {
+   "id": "drops-merino-extra-fine",
+   "brand": "Drops",
+   "name": "Merino Extra Fine",
+   "fibre": [
+    {
+     "pct": 100,
+     "fibre": "merino"
+    }
+   ],
+   "m50": 105,
+   "skein": {
+    "g": 50,
+    "m": 105
+   },
+   "sts": [
+    21,
+    21
+   ],
+   "rows": 28,
+   "needle": [
+    4,
+    4
+   ],
+   "structure": "glat",
+   "group": "B",
+   "url": "https://www.garnstudio.com/yarn-groups.php"
+  },
+  {
+   "id": "drops-muskat",
+   "brand": "Drops",
+   "name": "Muskat",
+   "fibre": [
+    {
+     "pct": 100,
+     "fibre": "bomuld"
+    }
+   ],
+   "m50": 100,
+   "skein": {
+    "g": 50,
+    "m": 100
+   },
+   "sts": [
+    21,
+    21
+   ],
+   "rows": 28,
+   "needle": [
+    4,
+    4
+   ],
+   "structure": "glat",
+   "group": "B",
+   "url": "https://www.garnstudio.com/yarn-groups.php"
+  },
+  {
+   "id": "drops-puna",
+   "brand": "Drops",
+   "name": "Puna",
+   "fibre": [
+    {
+     "pct": 100,
+     "fibre": "alpaka"
+    }
+   ],
+   "m50": 110,
+   "skein": {
+    "g": 50,
+    "m": 110
+   },
+   "sts": [
+    21,
+    21
+   ],
+   "rows": 28,
+   "needle": [
+    4,
+    4
+   ],
+   "structure": "glat",
+   "group": "B",
+   "url": "https://www.garnstudio.com/yarn-groups.php"
+  },
+  {
+   "id": "drops-sky",
+   "brand": "Drops",
+   "name": "Sky",
+   "fibre": [
+    {
+     "pct": 74,
+     "fibre": "alpaka"
+    },
+    {
+     "pct": 18,
+     "fibre": "polyamid"
+    },
+    {
+     "pct": 8,
+     "fibre": "uld"
+    }
+   ],
+   "m50": 190,
+   "skein": {
+    "g": 50,
+    "m": 190
+   },
+   "sts": [
+    21,
+    21
+   ],
+   "rows": 28,
+   "needle": [
+    4,
+    4
+   ],
+   "structure": "luftig",
+   "group": "B",
+   "url": "https://www.garnstudio.com/yarn-groups.php"
+  },
+  {
+   "id": "drops-soft-tweed",
+   "brand": "Drops",
+   "name": "Soft Tweed",
+   "fibre": [
+    {
+     "pct": 50,
+     "fibre": "uld"
+    },
+    {
+     "pct": 25,
+     "fibre": "alpaka"
+    },
+    {
+     "pct": 25,
+     "fibre": "viskose"
+    }
+   ],
+   "m50": 130,
+   "skein": {
+    "g": 50,
+    "m": 130
+   },
+   "sts": [
+    21,
+    21
+   ],
+   "rows": 28,
+   "needle": [
+    4,
+    4
+   ],
+   "structure": "glat",
+   "group": "B",
+   "url": "https://www.garnstudio.com/yarn-groups.php"
+  },
+  {
+   "id": "drops-air",
+   "brand": "Drops",
+   "name": "Air",
+   "fibre": [
+    {
+     "pct": 65,
+     "fibre": "alpaka"
+    },
+    {
+     "pct": 28,
+     "fibre": "polyamid"
+    },
+    {
+     "pct": 7,
+     "fibre": "uld"
+    }
+   ],
+   "m50": 150,
+   "skein": {
+    "g": 50,
+    "m": 150
+   },
+   "sts": [
+    17,
+    17
+   ],
+   "rows": 22,
+   "needle": [
+    5,
+    5
+   ],
+   "structure": "luftig",
+   "group": "C",
+   "url": "https://www.garnstudio.com/yarn-groups.php"
+  },
+  {
+   "id": "drops-alaska",
+   "brand": "Drops",
+   "name": "Alaska",
+   "fibre": [
+    {
+     "pct": 100,
+     "fibre": "uld"
+    }
+   ],
+   "m50": 70,
+   "skein": {
+    "g": 50,
+    "m": 70
+   },
+   "sts": [
+    17,
+    17
+   ],
+   "rows": 22,
+   "needle": [
+    5,
+    5
+   ],
+   "structure": "glat",
+   "group": "C",
+   "url": "https://www.garnstudio.com/yarn-groups.php"
+  },
+  {
+   "id": "drops-alpaca-boucle",
+   "brand": "Drops",
+   "name": "Alpaca Bouclé",
+   "fibre": [
+    {
+     "pct": 80,
+     "fibre": "alpaka"
+    },
+    {
+     "pct": 15,
+     "fibre": "uld"
+    },
+    {
+     "pct": 5,
+     "fibre": "polyamid"
+    }
+   ],
+   "m50": 140,
+   "skein": {
+    "g": 50,
+    "m": 140
+   },
+   "sts": [
+    17,
+    17
+   ],
+   "rows": 22,
+   "needle": [
+    5,
+    5
+   ],
+   "structure": "boucle",
+   "group": "C",
+   "url": "https://www.garnstudio.com/yarn-groups.php"
+  },
+  {
+   "id": "drops-big-merino",
+   "brand": "Drops",
+   "name": "Big Merino",
+   "fibre": [
+    {
+     "pct": 100,
+     "fibre": "merino"
+    }
+   ],
+   "m50": 75,
+   "skein": {
+    "g": 50,
+    "m": 75
+   },
+   "sts": [
+    17,
+    17
+   ],
+   "rows": 22,
+   "needle": [
+    5,
+    5
+   ],
+   "structure": "glat",
+   "group": "C",
+   "url": "https://www.garnstudio.com/yarn-groups.php"
+  },
+  {
+   "id": "drops-bomull-lin",
+   "brand": "Drops",
+   "name": "Bomull-Lin",
+   "fibre": [
+    {
+     "pct": 53,
+     "fibre": "bomuld"
+    },
+    {
+     "pct": 47,
+     "fibre": "hør"
+    }
+   ],
+   "m50": 85,
+   "skein": {
+    "g": 50,
+    "m": 85
+   },
+   "sts": [
+    17,
+    17
+   ],
+   "rows": 22,
+   "needle": [
+    5,
+    5
+   ],
+   "structure": "glat",
+   "group": "C",
+   "url": "https://www.garnstudio.com/yarn-groups.php"
+  },
+  {
+   "id": "drops-brushed-alpaca-silk",
+   "brand": "Drops",
+   "name": "Brushed Alpaca Silk",
+   "fibre": [
+    {
+     "pct": 77,
+     "fibre": "alpaka"
+    },
+    {
+     "pct": 23,
+     "fibre": "silke"
+    }
+   ],
+   "m50": 280,
+   "skein": {
+    "g": 25,
+    "m": 140
+   },
+   "sts": [
+    17,
+    17
+   ],
+   "rows": 22,
+   "needle": [
+    5,
+    5
+   ],
+   "structure": "borstet",
+   "group": "C",
+   "url": "https://www.garnstudio.com/yarn-groups.php"
+  },
+  {
+   "id": "drops-nepal",
+   "brand": "Drops",
+   "name": "Nepal",
+   "fibre": [
+    {
+     "pct": 65,
+     "fibre": "uld"
+    },
+    {
+     "pct": 35,
+     "fibre": "alpaka"
+    }
+   ],
+   "m50": 75,
+   "skein": {
+    "g": 50,
+    "m": 75
+   },
+   "sts": [
+    17,
+    17
+   ],
+   "rows": 22,
+   "needle": [
+    5,
+    5
+   ],
+   "structure": "glat",
+   "group": "C",
+   "url": "https://www.garnstudio.com/yarn-groups.php"
+  },
+  {
+   "id": "drops-paris",
+   "brand": "Drops",
+   "name": "Paris",
+   "fibre": [
+    {
+     "pct": 100,
+     "fibre": "bomuld"
+    }
+   ],
+   "m50": 75,
+   "skein": {
+    "g": 50,
+    "m": 75
+   },
+   "sts": [
+    17,
+    17
+   ],
+   "rows": 22,
+   "needle": [
+    5,
+    5
+   ],
+   "structure": "glat",
+   "group": "C",
+   "url": "https://www.garnstudio.com/yarn-groups.php"
+  },
+  {
+   "id": "drops-melody",
+   "brand": "Drops",
+   "name": "Melody",
+   "fibre": [
+    {
+     "pct": 71,
+     "fibre": "alpaka"
+    },
+    {
+     "pct": 25,
+     "fibre": "uld"
+    },
+    {
+     "pct": 4,
+     "fibre": "polyamid"
+    }
+   ],
+   "m50": 140,
+   "skein": {
+    "g": 50,
+    "m": 140
+   },
+   "sts": [
+    12,
+    12
+   ],
+   "rows": 14,
+   "needle": [
+    8,
+    8
+   ],
+   "structure": "luftig",
+   "group": "D",
+   "url": "https://www.garnstudio.com/yarn-groups.php"
+  },
+  {
+   "id": "drops-andes",
+   "brand": "Drops",
+   "name": "Andes",
+   "fibre": [
+    {
+     "pct": 65,
+     "fibre": "uld"
+    },
+    {
+     "pct": 35,
+     "fibre": "alpaka"
+    }
+   ],
+   "m50": 45,
+   "skein": {
+    "g": 100,
+    "m": 90
+   },
+   "sts": [
+    10,
+    10
+   ],
+   "rows": 14,
+   "needle": [
+    9,
+    9
+   ],
+   "structure": "glat",
+   "group": "E",
+   "url": "https://www.garnstudio.com/yarn-groups.php"
+  },
+  {
+   "id": "drops-snow",
+   "brand": "Drops",
+   "name": "Snow",
+   "fibre": [
+    {
+     "pct": 100,
+     "fibre": "uld"
+    }
+   ],
+   "m50": 50,
+   "skein": {
+    "g": 50,
+    "m": 50
+   },
+   "sts": [
+    10,
+    10
+   ],
+   "rows": 14,
+   "needle": [
+    9,
+    9
+   ],
+   "structure": "glat",
+   "group": "E",
+   "url": "https://www.garnstudio.com/yarn-groups.php"
+  },
+  {
+   "id": "drops-polaris",
+   "brand": "Drops",
+   "name": "Polaris",
+   "fibre": [
+    {
+     "pct": 100,
+     "fibre": "uld"
+    }
+   ],
+   "m50": 18,
+   "skein": {
+    "g": 100,
+    "m": 36
+   },
+   "sts": [
+    8,
+    8
+   ],
+   "rows": 10,
+   "needle": [
+    12,
+    12
+   ],
+   "structure": "glat",
+   "group": "F",
+   "url": "https://www.garnstudio.com/yarn-groups.php"
+  },
+  {
+   "id": "drops-glitter",
+   "brand": "Drops",
+   "name": "Glitter",
+   "fibre": [
+    {
+     "pct": 60,
+     "fibre": "cupro"
+    },
+    {
+     "pct": 40,
+     "fibre": "metal"
+    }
+   ],
+   "m50": 3500,
+   "skein": null,
+   "sts": null,
+   "rows": null,
+   "needle": null,
+   "structure": "effekt",
+   "group": null,
+   "url": "https://www.garnstudio.com/yarn-groups.php"
+  },
+  {
+   "id": "sandnes-alpakka-folgetrad",
+   "brand": "Sandnes Garn",
+   "name": "Alpakka Følgetråd",
+   "fibre": [
+    {
+     "pct": 100,
+     "fibre": "alpaka"
+    }
+   ],
+   "m50": 400,
+   "skein": {
+    "g": 50,
+    "m": 400
+   },
+   "sts": null,
+   "needle": null,
+   "structure": "glat",
+   "url": "https://www.sandnes-garn.com/alpakka-folgetrad",
+   "note": "Følgetråd: strikkes sammen med et andet garn, et alternativ til Tynn Silk Mohair uden fnug"
+  },
+  {
+   "id": "sandnes-alpakka-silke",
+   "brand": "Sandnes Garn",
+   "name": "Alpakka Silke",
+   "fibre": [
+    {
+     "pct": 70,
+     "fibre": "babyalpaka"
+    },
+    {
+     "pct": 30,
+     "fibre": "silke"
+    }
+   ],
+   "m50": 200,
+   "skein": {
+    "g": 50,
+    "m": 200
+   },
+   "sts": [
+    27,
+    28
+   ],
+   "needle": [
+    3,
+    3
+   ],
+   "structure": "glat",
+   "url": "https://www.sandnes-garn.com/alpakka-silke"
+  },
+  {
+   "id": "sandnes-alpakka-ull",
+   "brand": "Sandnes Garn",
+   "name": "Alpakka Ull",
+   "fibre": [
+    {
+     "pct": 65,
+     "fibre": "alpaka"
+    },
+    {
+     "pct": 35,
+     "fibre": "uld"
+    }
+   ],
+   "m50": 100,
+   "skein": {
+    "g": 50,
+    "m": 100
+   },
+   "sts": [
+    19,
+    22
+   ],
+   "needle": [
+    3.5,
+    5
+   ],
+   "structure": "glat",
+   "url": "https://www.sandnes-garn.com/alpakka-ull"
+  },
+  {
+   "id": "sandnes-atlas",
+   "brand": "Sandnes Garn",
+   "name": "Atlas",
+   "fibre": [
+    {
+     "pct": 70,
+     "fibre": "lammeuld"
+    },
+    {
+     "pct": 30,
+     "fibre": "merino"
+    }
+   ],
+   "m50": 108,
+   "skein": {
+    "g": 50,
+    "m": 108
+   },
+   "sts": [
+    18,
+    18
+   ],
+   "needle": [
+    4,
+    4
+   ],
+   "structure": "glat",
+   "url": "https://www.sandnes-garn.com/atlas"
+  },
+  {
+   "id": "sandnes-babyull-lanett",
+   "brand": "Sandnes Garn",
+   "name": "Babyull Lanett",
+   "fibre": [
+    {
+     "pct": 100,
+     "fibre": "merino"
+    }
+   ],
+   "m50": 175,
+   "skein": {
+    "g": 50,
+    "m": 175
+   },
+   "sts": [
+    27,
+    31
+   ],
+   "needle": [
+    3,
+    3
+   ],
+   "structure": "glat",
+   "url": "https://www.sandnes-garn.com/lanett",
+   "superwash": true
+  },
+  {
+   "id": "sandnes-ballerina-chunky-mohair",
+   "brand": "Sandnes Garn",
+   "name": "Ballerina Chunky Mohair",
+   "fibre": [
+    {
+     "pct": 77,
+     "fibre": "mohair"
+    },
+    {
+     "pct": 18,
+     "fibre": "uld"
+    },
+    {
+     "pct": 5,
+     "fibre": "polyamid"
+    }
+   ],
+   "m50": 135,
+   "skein": {
+    "g": 50,
+    "m": 135
+   },
+   "sts": [
+    13,
+    16
+   ],
+   "needle": [
+    5,
+    7
+   ],
+   "structure": "mohair",
+   "url": "https://www.sandnes-garn.com/ballerina",
+   "note": "Kan strikkes alene eller som følgetråd"
+  },
+  {
+   "id": "sandnes-borstet-alpakka",
+   "brand": "Sandnes Garn",
+   "name": "Børstet Alpakka",
+   "fibre": [
+    {
+     "pct": 96,
+     "fibre": "alpaka"
+    },
+    {
+     "pct": 4,
+     "fibre": "nylon"
+    }
+   ],
+   "m50": 110,
+   "skein": {
+    "g": 50,
+    "m": 110
+   },
+   "sts": [
+    12,
+    18
+   ],
+   "needle": [
+    4,
+    7
+   ],
+   "structure": "borstet",
+   "url": "https://www.sandnes-garn.com/borstet-alpakka"
+  },
+  {
+   "id": "sandnes-cashmere",
+   "brand": "Sandnes Garn",
+   "name": "Cashmere",
+   "fibre": [
+    {
+     "pct": 100,
+     "fibre": "kashmir"
+    }
+   ],
+   "m50": 220,
+   "skein": {
+    "g": 25,
+    "m": 110
+   },
+   "sts": [
+    22,
+    25
+   ],
+   "needle": [
+    3,
+    4.5
+   ],
+   "structure": "glat",
+   "url": "https://www.sandnes-garn.com/cashmere"
+  },
+  {
+   "id": "sandnes-double-sunday",
+   "brand": "Sandnes Garn",
+   "name": "Double Sunday",
+   "fibre": [
+    {
+     "pct": 100,
+     "fibre": "merino"
+    }
+   ],
+   "m50": 108,
+   "skein": {
+    "g": 50,
+    "m": 108
+   },
+   "sts": [
+    20,
+    21
+   ],
+   "needle": [
+    3.5,
+    4
+   ],
+   "structure": "glat",
+   "url": "https://www.sandnes-garn.com/double-sunday",
+   "superwash": false,
+   "note": "Fås også i PetiteKnits farver"
+  },
+  {
+   "id": "sandnes-duo",
+   "brand": "Sandnes Garn",
+   "name": "Duo",
+   "fibre": [
+    {
+     "pct": 50,
+     "fibre": "merino"
+    },
+    {
+     "pct": 50,
+     "fibre": "pimabomuld"
+    }
+   ],
+   "m50": 115,
+   "skein": {
+    "g": 50,
+    "m": 115
+   },
+   "sts": [
+    22,
+    22
+   ],
+   "needle": [
+    3.5,
+    3.5
+   ],
+   "structure": "glat",
+   "url": "https://www.sandnes-garn.com/duo"
+  },
+  {
+   "id": "sandnes-fritidsgarn",
+   "brand": "Sandnes Garn",
+   "name": "Fritidsgarn",
+   "fibre": [
+    {
+     "pct": 100,
+     "fibre": "uld"
+    }
+   ],
+   "m50": 70,
+   "skein": {
+    "g": 50,
+    "m": 70
+   },
+   "sts": [
+    15,
+    15
+   ],
+   "needle": [
+    5.5,
+    5.5
+   ],
+   "structure": "glat",
+   "url": "https://www.sandnes-garn.com/fritidsgarn",
+   "note": "Velegnet til filtning"
+  },
+  {
+   "id": "sandnes-kos",
+   "brand": "Sandnes Garn",
+   "name": "Kos",
+   "fibre": [
+    {
+     "pct": 62,
+     "fibre": "alpaka"
+    },
+    {
+     "pct": 29,
+     "fibre": "nylon"
+    },
+    {
+     "pct": 9,
+     "fibre": "uld"
+    }
+   ],
+   "m50": 150,
+   "skein": {
+    "g": 50,
+    "m": 150
+   },
+   "sts": [
+    16,
+    18
+   ],
+   "needle": [
+    4.5,
+    5.5
+   ],
+   "structure": "luftig",
+   "url": "https://www.sandnes-garn.com/kos",
+   "note": "Blæst ind i en nylonstrømpe"
+  },
+  {
+   "id": "sandnes-labbegarn",
+   "brand": "Sandnes Garn",
+   "name": "Labbegarn",
+   "fibre": [
+    {
+     "pct": 80,
+     "fibre": "uld"
+    },
+    {
+     "pct": 20,
+     "fibre": "nylon"
+    }
+   ],
+   "m50": 98,
+   "skein": {
+    "g": 50,
+    "m": 98
+   },
+   "sts": [
+    19,
+    19
+   ],
+   "needle": [
+    3.5,
+    3.5
+   ],
+   "structure": "glat",
+   "url": "https://www.sandnes-garn.com/labbegarn",
+   "note": "Sokkegarn"
+  },
+  {
+   "id": "sandnes-line",
+   "brand": "Sandnes Garn",
+   "name": "Line",
+   "fibre": [
+    {
+     "pct": 53,
+     "fibre": "bomuld"
+    },
+    {
+     "pct": 33,
+     "fibre": "viskose"
+    },
+    {
+     "pct": 14,
+     "fibre": "hør"
+    }
+   ],
+   "m50": 110,
+   "skein": {
+    "g": 50,
+    "m": 110
+   },
+   "sts": [
+    20,
+    20
+   ],
+   "needle": [
+    4,
+    4
+   ],
+   "structure": "glat",
+   "url": "https://www.sandnes-garn.com/line"
+  },
+  {
+   "id": "sandnes-mandarin-petit",
+   "brand": "Sandnes Garn",
+   "name": "Mandarin Petit",
+   "fibre": [
+    {
+     "pct": 100,
+     "fibre": "bomuld"
+    }
+   ],
+   "m50": 180,
+   "skein": {
+    "g": 50,
+    "m": 180
+   },
+   "sts": [
+    27,
+    27
+   ],
+   "needle": [
+    3,
+    3
+   ],
+   "structure": "glat",
+   "url": "https://www.sandnes-garn.com/mandarin-petit"
+  },
+  {
+   "id": "sandnes-merinoull",
+   "brand": "Sandnes Garn",
+   "name": "Merinoull",
+   "fibre": [
+    {
+     "pct": 100,
+     "fibre": "merino"
+    }
+   ],
+   "m50": 105,
+   "skein": {
+    "g": 50,
+    "m": 105
+   },
+   "sts": [
+    22,
+    22
+   ],
+   "needle": [
+    3.5,
+    3.5
+   ],
+   "structure": "glat",
+   "url": "https://www.sandnes-garn.com/merinoull",
+   "superwash": true
+  },
+  {
+   "id": "sandnes-mini-alpakka",
+   "brand": "Sandnes Garn",
+   "name": "Mini Alpakka",
+   "fibre": [
+    {
+     "pct": 100,
+     "fibre": "alpaka"
+    }
+   ],
+   "m50": 150,
+   "skein": {
+    "g": 50,
+    "m": 150
+   },
+   "sts": [
+    27,
+    27
+   ],
+   "needle": [
+    3,
+    3
+   ],
+   "structure": "glat",
+   "url": "https://www.sandnes-garn.com/mini-alpakka"
+  },
+  {
+   "id": "sandnes-paljett",
+   "brand": "Sandnes Garn",
+   "name": "Paljett",
+   "fibre": [
+    {
+     "pct": 55,
+     "fibre": "bomuld"
+    },
+    {
+     "pct": 45,
+     "fibre": "polyester"
+    }
+   ],
+   "m50": 140,
+   "skein": {
+    "g": 50,
+    "m": 140
+   },
+   "sts": null,
+   "needle": null,
+   "structure": "effekt",
+   "url": "https://www.sandnes-garn.com/paljett",
+   "note": "Kan strikkes alene eller som følgetråd"
+  },
+  {
+   "id": "sandnes-peer-gynt",
+   "brand": "Sandnes Garn",
+   "name": "Peer Gynt",
+   "fibre": [
+    {
+     "pct": 100,
+     "fibre": "uld"
+    }
+   ],
+   "m50": 91,
+   "skein": {
+    "g": 50,
+    "m": 91
+   },
+   "sts": [
+    22,
+    22
+   ],
+   "needle": [
+    3.5,
+    4
+   ],
+   "structure": "glat",
+   "url": "https://www.sandnes-garn.com/peer-gynt-1865",
+   "note": "Fås også i PetiteKnits farver"
+  },
+  {
+   "id": "sandnes-perfect",
+   "brand": "Sandnes Garn",
+   "name": "Perfect",
+   "fibre": [
+    {
+     "pct": 80,
+     "fibre": "uld"
+    },
+    {
+     "pct": 20,
+     "fibre": "nylon"
+    }
+   ],
+   "m50": 100,
+   "skein": {
+    "g": 50,
+    "m": 100
+   },
+   "sts": [
+    22,
+    22
+   ],
+   "needle": [
+    3.5,
+    3.5
+   ],
+   "structure": "glat",
+   "url": "https://www.sandnes-garn.com/perfect-superwash",
+   "superwash": true,
+   "note": "Sokkegarn"
+  },
+  {
+   "id": "sandnes-poppy",
+   "brand": "Sandnes Garn",
+   "name": "Poppy",
+   "fibre": [
+    {
+     "pct": 50,
+     "fibre": "alpaka"
+    },
+    {
+     "pct": 35,
+     "fibre": "bomuld"
+    },
+    {
+     "pct": 15,
+     "fibre": "merino"
+    }
+   ],
+   "m50": 110,
+   "skein": {
+    "g": 50,
+    "m": 110
+   },
+   "sts": [
+    14,
+    17
+   ],
+   "needle": [
+    5.5,
+    7
+   ],
+   "structure": "luftig",
+   "url": "https://www.sandnes-garn.com/poppy",
+   "note": "Blæst ind i en bomuldsstrømpe"
+  },
+  {
+   "id": "sandnes-primo-tynn-silk-mohair",
+   "brand": "Sandnes Garn",
+   "name": "Primo Tynn Silk Mohair",
+   "fibre": [
+    {
+     "pct": 75,
+     "fibre": "kid mohair"
+    },
+    {
+     "pct": 25,
+     "fibre": "silke"
+    }
+   ],
+   "m50": 424,
+   "skein": {
+    "g": 25,
+    "m": 212
+   },
+   "sts": [
+    18,
+    24
+   ],
+   "needle": [
+    5,
+    5
+   ],
+   "structure": "mohair",
+   "url": "https://www.sandnes-garn.com/primo-tynn-silk-mohair"
+  },
+  {
+   "id": "sandnes-sisu",
+   "brand": "Sandnes Garn",
+   "name": "Sisu",
+   "fibre": [
+    {
+     "pct": 80,
+     "fibre": "uld"
+    },
+    {
+     "pct": 20,
+     "fibre": "nylon"
+    }
+   ],
+   "m50": 175,
+   "skein": {
+    "g": 50,
+    "m": 175
+   },
+   "sts": [
+    27,
+    27
+   ],
+   "needle": [
+    2.5,
+    3
+   ],
+   "structure": "glat",
+   "url": "https://www.sandnes-garn.com/sisu-superwash",
+   "superwash": true,
+   "note": "Sokkegarn"
+  },
+  {
+   "id": "sandnes-smart",
+   "brand": "Sandnes Garn",
+   "name": "Smart",
+   "fibre": [
+    {
+     "pct": 100,
+     "fibre": "uld"
+    }
+   ],
+   "m50": 100,
+   "skein": {
+    "g": 50,
+    "m": 100
+   },
+   "sts": [
+    22,
+    22
+   ],
+   "needle": [
+    3.5,
+    3.5
+   ],
+   "structure": "glat",
+   "url": "https://www.sandnes-garn.com/smart",
+   "superwash": true
+  },
+  {
+   "id": "sandnes-sunday",
+   "brand": "Sandnes Garn",
+   "name": "Sunday",
+   "fibre": [
+    {
+     "pct": 100,
+     "fibre": "merino"
+    }
+   ],
+   "m50": 235,
+   "skein": {
+    "g": 50,
+    "m": 235
+   },
+   "sts": [
+    28,
+    28
+   ],
+   "needle": [
+    3,
+    3
+   ],
+   "structure": "glat",
+   "url": "https://www.sandnes-garn.com/sunday",
+   "superwash": false,
+   "note": "Fås også i PetiteKnits farver"
+  },
+  {
+   "id": "sandnes-tresko",
+   "brand": "Sandnes Garn",
+   "name": "Tresko",
+   "fibre": [
+    {
+     "pct": 80,
+     "fibre": "uld"
+    },
+    {
+     "pct": 20,
+     "fibre": "nylon"
+    }
+   ],
+   "m50": 105,
+   "skein": {
+    "g": 50,
+    "m": 105
+   },
+   "sts": [
+    24,
+    24
+   ],
+   "needle": [
+    3,
+    3.5
+   ],
+   "structure": "glat",
+   "url": "https://www.sandnes-garn.com/tresko-3-trads",
+   "note": "Sokkegarn"
+  },
+  {
+   "id": "sandnes-tynn-line",
+   "brand": "Sandnes Garn",
+   "name": "Tynn Line",
+   "fibre": [
+    {
+     "pct": 53,
+     "fibre": "bomuld"
+    },
+    {
+     "pct": 33,
+     "fibre": "viskose"
+    },
+    {
+     "pct": 14,
+     "fibre": "hør"
+    }
+   ],
+   "m50": 220,
+   "skein": {
+    "g": 50,
+    "m": 220
+   },
+   "sts": [
+    27,
+    28
+   ],
+   "needle": [
+    3,
+    3
+   ],
+   "structure": "glat",
+   "url": "https://www.sandnes-garn.com/tynn-line"
+  },
+  {
+   "id": "sandnes-tynn-merinoull",
+   "brand": "Sandnes Garn",
+   "name": "Tynn Merinoull",
+   "fibre": [
+    {
+     "pct": 100,
+     "fibre": "merino"
+    }
+   ],
+   "m50": 175,
+   "skein": {
+    "g": 50,
+    "m": 175
+   },
+   "sts": [
+    27,
+    27
+   ],
+   "needle": [
+    3,
+    3
+   ],
+   "structure": "glat",
+   "url": "https://www.sandnes-garn.com/tynn-merinoull",
+   "superwash": true
+  },
+  {
+   "id": "sandnes-tynn-peer-gynt",
+   "brand": "Sandnes Garn",
+   "name": "Tynn Peer Gynt",
+   "fibre": [
+    {
+     "pct": 100,
+     "fibre": "uld"
+    }
+   ],
+   "m50": 205,
+   "skein": {
+    "g": 50,
+    "m": 205
+   },
+   "sts": [
+    27,
+    27
+   ],
+   "needle": [
+    3,
+    3
+   ],
+   "structure": "glat",
+   "url": "https://www.sandnes-garn.com/tynn-peer-gynt"
+  },
+  {
+   "id": "sandnes-tynn-silk-mohair",
+   "brand": "Sandnes Garn",
+   "name": "Tynn Silk Mohair",
+   "fibre": [
+    {
+     "pct": 57,
+     "fibre": "mohair"
+    },
+    {
+     "pct": 28,
+     "fibre": "silke"
+    },
+    {
+     "pct": 15,
+     "fibre": "uld"
+    }
+   ],
+   "m50": 424,
+   "skein": {
+    "g": 25,
+    "m": 212
+   },
+   "sts": [
+    18,
+    24
+   ],
+   "needle": [
+    5,
+    5
+   ],
+   "structure": "mohair",
+   "url": "https://www.sandnes-garn.com/tynn-silk-mohair",
+   "note": "Strikkes ofte sammen med fx Sunday"
+  }
+ ]
+}
