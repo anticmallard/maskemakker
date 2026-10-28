@@ -83,6 +83,37 @@ export async function deleteRecipe(id) {
   localStorage.setItem(RECIPES_KEY, JSON.stringify(all));
 }
 
+// ----- Your own yarns in the garnkatalog -----
+// Yarns you add yourself, in the same format as yarns.json, so they can be searched,
+// compared and suggested like the others.
+const YARNS_KEY = 'strik.yarns.v1';
+
+function readYarns() {
+  try {
+    return JSON.parse(localStorage.getItem(YARNS_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
+export async function listYarns() {
+  return Object.values(readYarns()).sort((a, b) => (a.created || 0) - (b.created || 0));
+}
+
+export async function saveYarn(yarn) {
+  const all = readYarns();
+  yarn.updated = Date.now();
+  all[yarn.id] = yarn;
+  localStorage.setItem(YARNS_KEY, JSON.stringify(all));
+  return yarn;
+}
+
+export async function deleteYarn(id) {
+  const all = readYarns();
+  delete all[id];
+  localStorage.setItem(YARNS_KEY, JSON.stringify(all));
+}
+
 // Small device settings (like "keep screen on"). These stay on the
 // device even in version 2 — they're about this phone, not your knitting.
 export function getSetting(name, fallback) {

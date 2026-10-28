@@ -9,12 +9,23 @@
 //   which matches the DROPS rule "2 × group A ≈ group C".
 
 let catalog = null;
+let official = [];   // the yarns from yarns.json; your own yarns are added on top
+
+/** Adds the yarns you have added yourself (from storage) to the catalogue and the matching. */
+export function useOwnYarns(list) {
+  if (!catalog) return;
+  catalog.yarns = [...official, ...list.map((y) => ({ ...y, own: true }))];
+  prepare(catalog);
+}
+export const ownCount = () => (catalog ? catalog.yarns.length - official.length : 0);
+export const officialCount = () => official.length;
 /** Loads yarns.json once. */
 export async function loadCatalog() {
   if (!catalog) {
     const res = await fetch('yarns.json');
     if (!res.ok) throw new Error('Garnkataloget kunne ikke hentes');
     catalog = await res.json();
+    official = catalog.yarns;
     prepare(catalog);
   }
   return catalog;

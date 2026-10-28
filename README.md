@@ -52,8 +52,9 @@ The third tab finds yarn alternatives. It uses `yarns.json`, a catalogue of yarn
 
 - **Matching:** smooth yarns are compared by metres per 50 g (the same for every brand); airy, brushed, bouclé and mohair yarns by their own gauge. Fibre and type count too. Two strands held together are worked out as one thicker yarn.
 - **Your patterns:** a pattern's yarn is linked to the catalogue when its name is written "Navn fra Mærke", e.g. "Sunday fra Sandnes Garn". Yarns that aren't in the catalogue still work when the text gives the metres, e.g. "(50 g = 175 m)".
-- **From a project:** on Materialer, "Find et alternativ til …" opens Find alternativ with the pattern's yarn and the metres for your size filled in. "Brug dette garn" saves the choice as "Dit garn".
-- **Adding a yarn or brand:** add entries to `yarns` in `yarns.json` with the same fields (`id`, `brand`, `name`, `fibre`, `m50`, `skein`, `sts`, `needle`, `structure`, `url`), add the brand under `brands`, and update `updated`.
+- **From a project:** on Materialer, "Vælg et alternativ til …" opens the Garnvælger with the pattern's yarn and the metres for your size filled in. "Brug dette garn" saves the choice as "Dit garn".
+- **Your own yarns:** "Tilføj et garn" in Garnkataloget, or "Kan du ikke finde dit garn?" in Vælg et alternativ, adds a yarn of your own. It is saved on the phone (and in the backup), marked "Dit eget", and works like the catalogue's yarns. Edit or delete it from its page.
+- **Adding a yarn or brand to yarns.json:** add entries to `yarns` in `yarns.json` with the same fields (`id`, `brand`, `name`, `fibre`, `m50`, `skein`, `sts`, `needle`, `structure`, `url`), add the brand under `brands`, and update `updated`.
 
 ## Backup
 

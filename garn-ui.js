@@ -7,6 +7,15 @@ let C = null;   // helpers from app.js
 export function init(ctx) { C = ctx; }
 
 const esc = (s) => C.esc(s);
+
+/** The catalogue with your own yarns added. */
+async function ensure() {
+  const cat = await G.loadCatalog();
+  G.useOwnYarns(await C.store.listYarns());
+  return cat;
+}
+/** "64 garner fra Drops og Sandnes Garn + 2 af dine egne" */
+const catalogLine = (cat) => `${G.officialCount()} garner fra ${Object.keys(cat.brands).join(' og ')}${G.ownCount() ? ` + ${G.ownCount()} af dine egne` : ''}`;
 const num = (n) => Number(n).toLocaleString('da-DK');
 const dec = (n) => String(n).replace('.', ',');
 const range = (r) => (!r ? '' : r[0] === r[1] ? dec(r[0]) : `${dec(r[0])}–${dec(r[1])}`);
@@ -18,6 +27,7 @@ const S = {
   cmp: { a: null, b: null, metres: '500' },
   sammen: { a: null, b: null, metres: '500' },
   strikke: { a: null },
+  add: { back: false },   // true when "Tilføj et garn" was opened from Find alternativ
 };
 
 /* ---------- icons ---------- */
@@ -164,7 +174,7 @@ function pickYarn({ title = 'Vælg garn', suggest = [], ownList = [] } = {}) {
           ${own.length ? `<div class="group-label">Fra dine opskrifter</div><div class="panel g-list">${own.map((e) => yarnBtn(reg(e.ref))).join('')}</div>` : ''}
           <div class="group-label">${qq ? `${all.length} garner` : 'Alle garner'}</div>
           ${all.length ? `<div class="panel g-list">${all.map((y) => yarnBtn(reg({ id: y.id }), `<span class="g-m">${num(y.m50)} m</span>`)).join('')}</div>` : '<div class="placeholder">Ingen garner i garnkataloget passer på søgningen</div>'}
-          <button class="import-row g-own" data-act="own">${I.plus}<span><b>Andet garn</b><span>Skriv løbelængden fra banderolen eller opskriften</span></span></button>
+          <button class="import-row g-own" data-act="own">${I.plus}<span><b>Tilføj et garn til garnkataloget</b><span>Til garn, der ikke er i kataloget</span></span></button>
         </div>`;
       v.querySelector('[data-act="close"]').onclick = () => done(null);
       v.querySelector('[data-act="own"]').onclick = () => { mode = 'form'; draw(); };
@@ -172,39 +182,90 @@ function pickYarn({ title = 'Vælg garn', suggest = [], ownList = [] } = {}) {
       const inp = v.querySelector('#pk-q');
       inp.oninput = () => { q = inp.value; const pos = inp.selectionStart; draw(); const n = v.querySelector('#pk-q'); n.focus(); n.setSelectionRange(pos, pos); };
     }
-    const form = { name: '', brand: '', g: '50', m: '', fibre: '' };
     function drawForm() {
-      const fromRecipes = ownList.filter((e) => e.ref.custom);
-      const fib = [['uld', 'Uld / merino'], ['alpaka', 'Alpaka'], ['bomuld', 'Bomuld'], ['mohair', 'Mohair'], ['kashmir', 'Kashmir'], ['', 'Ved ikke']];
       v.innerHTML = `
-        <div class="g-picker-bar"><button class="icon-btn" data-act="list" aria-label="Tilbage">${C.icons.back}</button><b>Andet garn</b><button class="icon-btn" data-act="close" aria-label="Luk">${I.close}</button></div>
-        <div class="g-picker-body g-form">
-          ${fromRecipes.length ? `<div class="g-note">Fra dine opskrifter: ${fromRecipes.map((e) => `<button class="g-link" data-fill="${esc(e.key)}">${esc(e.ref.custom.name)}${e.ref.custom.brand ? ` fra ${esc(e.ref.custom.brand)}` : ''}</button>`).join(', ')}</div>` : ''}
-          <div class="g-two"><label class="my-field"><span>Navn</span><input id="f-name" value="${esc(form.name)}" autocomplete="off"></label>
-            <label class="my-field"><span>Mærke</span><input id="f-brand" value="${esc(form.brand)}" autocomplete="off"></label></div>
-          <div class="my-field"><span>Løbelængde · står på banderolen eller i opskriften</span>
-            <div class="g-ratio"><input id="f-g" inputmode="decimal" value="${esc(form.g)}" aria-label="Gram"><span>g =</span><input id="f-m" inputmode="decimal" value="${esc(form.m)}" aria-label="Meter"><span>m</span></div></div>
-          <div class="my-field"><span>Fiber · giver bedre forslag</span>
-            <div class="g-fibres">${fib.map(([k, l]) => `<button class="g-fib" data-fib="${k}" aria-pressed="${form.fibre === k}">${l}</button>`).join('')}</div></div>
-          <button class="primary brand" id="f-ok">Brug garnet</button>
-        </div>`;
-      const read = () => { form.name = v.querySelector('#f-name').value; form.brand = v.querySelector('#f-brand').value; form.g = v.querySelector('#f-g').value; form.m = v.querySelector('#f-m').value; };
+        <div class="g-picker-bar"><button class="icon-btn" data-act="list" aria-label="Tilbage">${C.icons.back}</button><b>Tilføj et garn</b><button class="icon-btn" data-act="close" aria-label="Luk">${I.close}</button></div>
+        <div class="g-picker-body" id="pk-form"></div>`;
       v.querySelector('[data-act="close"]').onclick = () => done(null);
-      v.querySelector('[data-act="list"]').onclick = () => { read(); mode = 'list'; draw(); };
-      v.querySelectorAll('[data-fib]').forEach((b) => (b.onclick = () => { read(); form.fibre = b.dataset.fib; drawForm(); }));
-      v.querySelectorAll('[data-fill]').forEach((b) => (b.onclick = () => {
-        const c = fromRecipes.find((e) => e.key === b.dataset.fill).ref.custom;
-        Object.assign(form, { name: c.name, brand: c.brand, g: String(c.g), m: String(c.m) });
-        drawForm();
-      }));
-      v.querySelector('#f-ok').onclick = () => {
-        read();
-        const g = parseFloat(form.g.replace(',', '.')), m = parseFloat(form.m.replace(',', '.'));
-        if (!(g > 0 && m > 0)) { C.toast('Skriv både gram og meter, fx 50 g = 175 m'); return; }
-        done({ custom: { name: form.name.trim() || 'Dit garn', brand: form.brand.trim(), g, m, fibre: form.fibre } });
-      };
+      v.querySelector('[data-act="list"]').onclick = () => { mode = 'list'; draw(); };
+      yarnForm(v.querySelector('#pk-form'), null, ownList, (y) => done({ id: y.id }));
     }
     draw();
+  });
+}
+
+/* ---------- your own yarn: add, edit ---------- */
+
+const FIB_OPTS = [['uld', 'Uld / merino'], ['alpaka', 'Alpaka'], ['bomuld', 'Bomuld'], ['mohair', 'Mohair'], ['kashmir', 'Kashmir'], ['silke', 'Silke'], ['hør', 'Hør'], ['', 'Ved ikke']];
+const TYPE_OPTS = [['glat', 'Glat'], ['luftig', 'Luftig'], ['borstet', 'Børstet'], ['mohair', 'Mohair'], ['boucle', 'Bouclé']];
+
+/**
+ * The form for a yarn of your own. Saves it in the garnkatalog and calls onSaved(yarn).
+ * `ownList` gives suggestions from your patterns' yarns that aren't in the catalogue.
+ */
+function yarnForm(root, existing, ownList, onSaved) {
+  const f = existing
+    ? { name: existing.name, brand: existing.brand || '', g: String(existing.skein?.g ?? 50), m: String(existing.skein?.m ?? ''),
+        fibre: existing.fibre?.[0]?.fibre || '', structure: existing.structure || 'glat', sts: existing.sts ? String(existing.sts[0]) : '', needle: existing.needle ? dec(existing.needle[0]) : '' }
+    : { name: '', brand: '', g: '50', m: '', fibre: '', structure: 'glat', sts: '', needle: '' };
+  const fromRecipes = existing ? [] : ownList.filter((e) => e.ref.custom);
+  const read = () => ['name', 'brand', 'g', 'm', 'sts', 'needle'].forEach((k) => { f[k] = root.querySelector(`#yf-${k}`).value; });
+  const chips = (key, opts) => opts.map(([k, l]) => `<button class="g-fib" data-${key}="${k}" aria-pressed="${f[key] === k}">${l}</button>`).join('');
+  function draw() {
+    root.innerHTML = `<div class="g-form">
+      ${fromRecipes.length ? `<div class="g-note">Fra dine opskrifter: ${fromRecipes.map((e) => `<button class="g-link" data-fill="${esc(e.key)}">${esc(e.ref.custom.name)}${e.ref.custom.brand ? ` fra ${esc(e.ref.custom.brand)}` : ''}</button>`).join(', ')}</div>` : ''}
+      <div class="g-two"><label class="my-field"><span>Navn</span><input id="yf-name" value="${esc(f.name)}" placeholder="Fx Pernilla" autocomplete="off"></label>
+        <label class="my-field"><span>Mærke</span><input id="yf-brand" value="${esc(f.brand)}" placeholder="Fx Filcolana" autocomplete="off"></label></div>
+      <div class="my-field"><span>Nøgle · står på banderolen</span>
+        <div class="g-ratio"><input id="yf-g" inputmode="decimal" value="${esc(f.g)}" aria-label="Gram"><span>g =</span><input id="yf-m" inputmode="decimal" value="${esc(f.m)}" aria-label="Meter"><span>m</span></div></div>
+      <div class="my-field"><span>Fiber</span><div class="g-fibres">${chips('fibre', FIB_OPTS)}</div></div>
+      <div class="my-field"><span>Type</span><div class="g-fibres">${chips('structure', TYPE_OPTS)}</div>
+        <span class="g-hint">${f.structure === 'glat' ? 'Det almindelige, glatte garn.' : 'Skriv strikkefastheden for luftigt, børstet og mohair-garn. Deres løbelængde siger ikke meget om tykkelsen.'}</span></div>
+      <div class="g-two"><label class="my-field"><span>Strikkefasthed${f.structure === 'glat' ? ' (valgfri)' : ''}</span><span class="g-unit"><input id="yf-sts" inputmode="numeric" value="${esc(f.sts)}"><em>m pr. 10 cm</em></span></label>
+        <label class="my-field"><span>Pind (valgfri)</span><span class="g-unit"><input id="yf-needle" inputmode="decimal" value="${esc(f.needle)}"><em>mm</em></span></label></div>
+      <button class="primary brand" id="yf-save">${existing ? 'Gem ændringer' : 'Gem i garnkataloget'}</button>
+    </div>`;
+    root.querySelectorAll('[data-fibre]').forEach((b) => (b.onclick = () => { read(); f.fibre = b.dataset.fibre; draw(); }));
+    root.querySelectorAll('[data-structure]').forEach((b) => (b.onclick = () => { read(); f.structure = b.dataset.structure; draw(); }));
+    root.querySelectorAll('[data-fill]').forEach((b) => (b.onclick = () => {
+      const c = fromRecipes.find((e) => e.key === b.dataset.fill).ref.custom;
+      read(); Object.assign(f, { name: c.name, brand: c.brand, g: String(c.g), m: String(c.m) }); draw();
+    }));
+    root.querySelector('#yf-save').onclick = async () => {
+      read();
+      const n = (s) => parseFloat(String(s).replace(',', '.'));
+      const g = n(f.g), m = n(f.m), sts = n(f.sts), needle = n(f.needle);
+      if (!f.name.trim()) { C.toast('Skriv garnets navn'); return; }
+      if (!(g > 0 && m > 0)) { C.toast('Skriv nøglens vægt og længde, fx 50 g = 175 m'); return; }
+      if (f.structure !== 'glat' && !(sts > 0)) { C.toast('Skriv strikkefastheden, fx 18 masker pr. 10 cm'); return; }
+      const y = {
+        id: existing?.id || `mine-${Date.now().toString(36)}`, own: true, created: existing?.created || Date.now(),
+        brand: f.brand.trim(), name: f.name.trim(), fibre: f.fibre ? [{ pct: 100, fibre: f.fibre }] : [],
+        m50: Math.round((m * 50) / g), skein: { g, m }, sts: sts > 0 ? [sts, sts] : null, needle: needle > 0 ? [needle, needle] : null,
+        structure: f.structure, url: null,
+      };
+      await C.store.saveYarn(y);
+      G.useOwnYarns(await C.store.listYarns());
+      C.toast(existing ? 'Garnet er gemt' : `${y.name} er tilføjet garnkataloget`);
+      onSaved(y);
+    };
+  }
+  draw();
+}
+
+/** Page: add a yarn (#/garn/nyt) or edit one of yours (#/garn/ret/<id>). */
+async function renderYarnForm(id = null) {
+  const app = C.app;
+  await ensure();
+  const existing = id ? G.byId(id) : null;
+  if (id && !existing?.own) { C.go('#/garn/katalog'); return; }
+  const { list } = await mine();
+  app.innerHTML = `${subHeader(existing ? 'Ret garn' : 'Tilføj et garn', existing ? existing.name : 'Til garnkataloget')}<main class="g-page" id="yf-root"></main>`;
+  wireCommon(app);
+  yarnForm(app.querySelector('#yf-root'), existing, list, (y) => {
+    if (existing) { history.back(); return; }
+    if (S.add.back) { S.add.back = false; S.alt.added = y.id; history.back(); return; }   // back to Find alternativ
+    location.replace(`#/garn/y/${y.id}`);   // show the new yarn; Back goes to the catalogue
   });
 }
 
@@ -212,9 +273,8 @@ function pickYarn({ title = 'Vælg garn', suggest = [], ownList = [] } = {}) {
 
 async function renderTab() {
   const app = C.app;
-  const cat = await G.loadCatalog();
+  const cat = await ensure();
   const { list } = await mine();
-  const n = cat.yarns.length;
   const task = (href, title, sub, icon, primary = false) => `
     <button class="g-task ${primary ? 'primary-task' : ''}" data-href="${href}"><span class="g-task-ic">${icon}</span>
       <span><b>${title}</b><span>${sub}</span></span></button>`;
@@ -235,7 +295,7 @@ async function renderTab() {
         ${task('#/garn/strikke', 'Hvad kan jeg strikke?', 'Med et garn du har', I.knit)}
       </div>
       ${list.length ? `<div class="group-label">Garn i dine opskrifter · ${list.length}</div><div class="panel g-list">${rows}</div>` : ''}
-      <button class="g-all" data-href="#/garn/katalog"><span><b>Hele garnkataloget</b><span>${n} garner fra ${Object.keys(cat.brands).join(' og ')}</span></span>${C.icons.chevronRight}</button>
+      <button class="g-all" data-href="#/garn/katalog"><span><b>Hele garnkataloget</b><span>${catalogLine(cat)}</span></span>${C.icons.chevronRight}</button>
     </main>
     ${C.tabbar('garn')}`;
   C.wireHomeHeader();
@@ -251,25 +311,26 @@ async function renderTab() {
 /* ---------- catalogue (P59) ---------- */
 
 const SORTS = [['tyk', 'Tykkelse', 'Fra tyndt til tykt, grupperet efter pind'], ['navn', 'Navn', 'A–Å'], ['maerke', 'Mærke', 'Drops, Sandnes Garn'],
-  ['fiber', 'Fiber', 'Uld, alpaka, bomuld …'], ['meter', 'Meter pr. 50 g', 'Flest meter først'], ['mine', 'Dine garner først', 'Fra dine opskrifter og projekter']];
+  ['fiber', 'Fiber', 'Uld, alpaka, bomuld …'], ['meter', 'Meter pr. 50 g', 'Flest meter først'], ['mine', 'Dine garner først', 'Dine egne og dem fra dine opskrifter']];
 
 async function renderCatalog() {
   const app = C.app;
-  const cat = await G.loadCatalog();
+  const cat = await ensure();
   const { list: own } = await mine();
   const ownIds = new Set(own.filter((e) => e.ref.id).map((e) => e.ref.id));
   const k = S.kat;
   app.innerHTML = `
-    ${subHeader('Garnkataloget', `${cat.yarns.length} garner fra ${Object.keys(cat.brands).join(' og ')}`)}
+    ${subHeader('Garnkataloget', catalogLine(cat))}
     <main class="g-page">
       <label class="g-search-field">${I.search}<input id="kat-q" type="search" placeholder="Søg i garnkataloget" value="${esc(k.q)}" autocomplete="off"></label>
       <div class="g-filters" id="kat-f"></div>
       <div class="g-sortbar"><span id="kat-n"></span><button class="g-sortbtn" data-act="sort">${I.sort}Sortér: ${SORTS.find((s) => s[0] === k.sort)[1]}${I.down}</button></div>
       <div id="kat-list"></div>
+      <button class="import-row g-addrow" data-href="#/garn/nyt">${I.plus}<span><b>Tilføj et garn</b><span>Til garn, der ikke er i garnkataloget</span></span></button>
     </main>`;
   wireCommon(app);
   const FILT = {
-    brand: ['Mærke', Object.keys(cat.brands).map((b) => [b, b])],
+    brand: ['Mærke', [...Object.keys(cat.brands).map((b) => [b, b]), ...(G.ownCount() ? [['__own', 'Dine egne garner']] : [])]],
     tyk: ['Tykkelse', G.BANDS.map((b, i) => [String(i), `${b.label} · ${b.needle}`])],
     fiber: ['Fiber', G.FIBRES.map((f) => [f, f[0].toUpperCase() + f.slice(1)])],
     type: ['Type', Object.entries(G.TYPE)],
@@ -287,20 +348,20 @@ async function renderCatalog() {
     }));
   };
   const row = (y) => `<a class="g-row" href="#/garn/y/${y.id}">${strand(y.thick, y.structure)}
-      <span class="g-row-text"><b>${esc(y.name)}${ownIds.has(y.id) ? ` ${tag('I din opskrift')}` : ''}</b><span>${esc(brandShort(y.brand))} · ${esc(fibreShort(y))}</span></span>
+      <span class="g-row-text"><b>${esc(y.name)}${y.own ? ` ${tag('Dit eget', 'moss')}` : ''}${ownIds.has(y.id) ? ` ${tag('I din opskrift')}` : ''}</b><span>${esc([brandShort(y.brand), fibreShort(y)].filter(Boolean).join(' · '))}</span></span>
       <span class="g-m">${num(y.m50)} m</span></a>`;
   const drawList = () => {
     const q = k.q.trim().toLowerCase();
     let ys = cat.yarns.filter((y) => (!q || `${y.name} ${y.brand} ${fibreText(y)} ${G.TYPE[y.structure]}`.toLowerCase().includes(q))
       && (k.tyk == null || G.bandOf(y) === +k.tyk) && (k.fiber == null || G.mainFibre(y) === k.fiber || (y.fam[k.fiber] || 0) >= 30)
-      && (k.type == null || y.structure === k.type) && (k.brand == null || y.brand === k.brand));
+      && (k.type == null || y.structure === k.type) && (k.brand == null || (k.brand === '__own' ? y.own : !y.own && y.brand === k.brand)));
     const byName = (a, b) => a.name.localeCompare(b.name, 'da');
     const byThick = (a, b) => (b.thick ?? -1) - (a.thick ?? -1) || byName(a, b);
     let groups;
     if (k.sort === 'tyk') groups = [...G.BANDS.map((b, i) => [`${b.label} · ${b.needle}`, ys.filter((y) => G.bandOf(y) === i)]), ['Effekttråde', ys.filter((y) => G.bandOf(y) === G.BANDS.length)]];
-    else if (k.sort === 'maerke') groups = Object.keys(cat.brands).map((b) => [b, ys.filter((y) => y.brand === b)]);
+    else if (k.sort === 'maerke') groups = [...Object.keys(cat.brands).map((b) => [b, ys.filter((y) => !y.own && y.brand === b)]), ['Dine egne garner', ys.filter((y) => y.own)]];
     else if (k.sort === 'fiber') groups = [...G.FIBRES, 'viskose', 'syntetisk', 'andet'].map((f) => [f[0].toUpperCase() + f.slice(1), ys.filter((y) => G.mainFibre(y) === f)]);
-    else if (k.sort === 'mine') groups = [['Dine garner', ys.filter((y) => ownIds.has(y.id))], ['Øvrige garner', ys.filter((y) => !ownIds.has(y.id))]];
+    else if (k.sort === 'mine') groups = [['Dine garner', ys.filter((y) => y.own || ownIds.has(y.id))], ['Øvrige garner', ys.filter((y) => !y.own && !ownIds.has(y.id))]];
     else groups = [['', ys]];
     const sorter = k.sort === 'navn' || k.sort === 'maerke' || k.sort === 'fiber' ? byName : k.sort === 'meter' ? (a, b) => b.m50 - a.m50 : byThick;
     app.querySelector('#kat-n').textContent = `${ys.length} ${ys.length === 1 ? 'garn' : 'garner'}`;
@@ -323,7 +384,7 @@ async function renderCatalog() {
 
 async function renderYarn(id) {
   const app = C.app;
-  await G.loadCatalog();
+  await ensure();
   const y = G.byId(id);
   if (!y) { C.go('#/garn/katalog'); return; }
   const { list, recipes } = await mine();
@@ -348,11 +409,11 @@ async function renderYarn(id) {
   const recRow = (r, sub) => `<div class="g-rec">${C.recipeThumb(r)}<span class="g-row-text"><b>${esc(r.pattern.title)}</b><span>${sub}</span></span></div>`;
   const knitted = entry ? entry.knitted : [];
   const facts = [
-    y.sts ? `<span><i>Strikkefasthed</i><b>${range(y.sts)} masker</b><span>pr. 10 cm${y.needle ? ` på pind ${range(y.needle)}` : ''}</span></span>` : y.needle ? `<span><i>Pind</i><b>${range(y.needle)} mm</b><span>Mærkets anbefaling</span></span>` : '',
+    y.sts ? `<span><i>Strikkefasthed</i><b>${range(y.sts)} masker</b><span>pr. 10 cm${y.needle ? ` på pind ${range(y.needle)}` : ''}</span></span>` : y.needle ? `<span><i>Pind</i><b>${range(y.needle)} mm</b><span>${y.own ? 'Din angivelse' : 'Mærkets anbefaling'}</span></span>` : '',
   ].join('');
-  const domain = (y.url.match(/\/\/(?:www\.)?([^/]+)/) || [])[1] || '';
+  const domain = ((y.url || '').match(/\/\/(?:www\.)?([^/]+)/) || [])[1] || '';
   app.innerHTML = `
-    ${subHeader(y.name, y.brand)}
+    ${subHeader(y.name, y.own ? [y.brand, 'Dit eget garn'].filter(Boolean).join(' · ') : y.brand)}
     <main class="g-page">
       <div class="g-facts">${strand(y.thick, y.structure, 72)}
         <div class="g-facts-grid"><span><i>Løbelængde</i><b>${num(y.m50)} m</b><span>pr. 50 g</span></span>${facts}</div></div>
@@ -372,12 +433,21 @@ async function renderYarn(id) {
         <div class="panel g-list">${uses.map((r) => recRow(r, `Opskriften bruger ${esc(y.name)}`)).join('')}${could.map((c) => recRow(c.r, `Kan erstatte ${esc(c.name)} · ${G.RATING[c.s.rating].toLowerCase()}`)).join('')}</div>` : ''}
       ${knitted.length ? `<div class="g-h2"><span>Du har strikket med det</span></div>
         <div class="panel g-list">${knitted.map((p) => `<a class="g-rec" href="#/p/${p.id}">${C.projectThumb(p)}<span class="g-row-text"><b>${esc(p.pattern.title)}${p.finishedAt ? ` · ${esc(C.daDate(p.finishedAt, { month: 'short', year: 'numeric' }))}` : ''}</b><span>${esc(C.knitSentence(p))}</span></span>${C.icons.chevronRight}</a>`).join('')}</div>` : ''}
-      <p class="g-source">Fakta fra <a href="${esc(y.url)}" target="_blank" rel="noopener">${esc(domain)} ${I.out}</a> · ${esc(C.daDate(Date.parse(G.catalogUpdated()), { day: 'numeric', month: 'short', year: 'numeric' }))}</p>
+      ${y.own ? `<div class="g-two g-ownbtns"><button class="g-btn" data-href="#/garn/ret/${y.id}">Ret garnet</button><button class="g-btn danger" data-act="del">Slet garnet</button></div>
+      <p class="g-source">Tilføjet af dig${y.created ? ` · ${esc(C.daDate(y.created, { day: 'numeric', month: 'short', year: 'numeric' }))}` : ''}</p>`
+      : `<p class="g-source">Fakta fra <a href="${esc(y.url)}" target="_blank" rel="noopener">${esc(domain)} ${I.out}</a> · ${esc(C.daDate(Date.parse(G.catalogUpdated()), { day: 'numeric', month: 'short', year: 'numeric' }))}</p>`}
     </main>`;
   wireCommon(app);
   app.querySelectorAll('[data-act="alt"]').forEach((b) => (b.onclick = () => { S.alt.ref = { id }; C.go('#/garn/alternativ'); }));
   app.querySelector('[data-act="cmp"]').onclick = () => { S.cmp.a = { id }; S.cmp.b = null; C.go('#/garn/sammenlign'); };
   app.querySelector('[data-act="sammen"]').onclick = () => { S.sammen.a = { id }; S.sammen.b = null; C.go('#/garn/sammen'); };
+  app.querySelector('[data-act="del"]')?.addEventListener('click', async () => {
+    if (!(await C.ask(`Slet ${y.name} fra garnkataloget? Projekter, hvor du har brugt det, beholder garnet.`, 'Slet garnet', true))) return;
+    await C.store.deleteYarn(id);
+    G.useOwnYarns(await C.store.listYarns());
+    C.toast('Garnet er slettet');
+    location.replace('#/garn/katalog');
+  });
 }
 
 /* ---------- Find alternativ (P61) ---------- */
@@ -413,59 +483,79 @@ function resultCard(c, metres, cmpFrom, canUse = false) {
  * the metres for the chosen size are filled in, and "Brug dette garn" saves the choice as "Dit garn".
  */
 async function openForProject(pid) {
-  await G.loadCatalog();
+  await ensure();
   const p = await C.store.getProject(pid);
   if (!p) { C.go('#/garn'); return; }
   const idx = p.pattern.yarn?.length > 1 && p.yarnChoice != null ? p.yarnChoice : 0;
   const py = (p.pattern.yarn || [])[idx];
   if (S.alt.pid !== pid || S.alt.idx !== idx || S.alt.si !== p.sizeIndex) {   // new project, yarn or size: fill in again
     const amount = p.sizeIndex != null ? C.yarnAmount({ pattern: p.pattern, sizeIndex: p.sizeIndex, yarnChoice: idx, myYarns: [] }) : null;
-    S.alt = { ref: py ? G.resolvePatternYarn(py) : null, amount: amount && amount.unit.startsWith('m') ? String(amount.value) : '', unit: 'm', combos: false, pid, idx, si: p.sizeIndex };
+    const patM = amount && amount.unit.startsWith('m') ? amount.value : null;   // the pattern's metres for this size
+    S.alt = { ref: py ? G.resolvePatternYarn(py) : null, amount: patM ? String(patM) : '', unit: 'm', combos: false, pid, idx, si: p.sizeIndex, patM };
   }
   return renderAlternative(p);
 }
 
 async function renderAlternative(project = null) {
   const app = C.app;
-  await G.loadCatalog();
+  await ensure();
   if (!project && S.alt.pid) S.alt = { ref: null, amount: '', unit: 'g', combos: false };   // left project mode
   const { list } = await mine();
   const a = S.alt, i = info(a.ref);
   const metres = metresOf(i, a.amount, a.unit);
-  const res = i ? G.alternatives(G.targetOf(a.ref), { limit: 8, withCombos: a.combos }) : [];
+  // Single yarns first. Two strands held together get their own section, shown only when
+  // a combination is a good match ("Meget tæt på" or "Godt alternativ").
+  // The yarn you just added to the garnkatalog from here comes first, however well it fits
+  const added = i && a.added && G.byId(a.added) && !sameRef({ id: a.added }, a.ref) ? G.byId(a.added) : null;
+  const addedCard = added ? (G.rateYarn(added.id, G.targetOf(a.ref))
+    || { yarns: [added], sts: added.thick, m50: added.m50, structure: added.structure, rating: 'try', why: [`Ligger langt fra ${i.name} i tykkelse`] }) : null;
+  const res = i ? G.alternatives(G.targetOf(a.ref), { limit: 8 }).filter((c) => !added || c.yarns[0].id !== added.id) : [];
+  const pairs = i ? G.alternatives(G.targetOf(a.ref), { limit: 60, withCombos: true }).filter((c) => c.yarns.length > 1 && c.rating !== 'try').slice(0, 5) : [];
+  const listHtml = (m) => `${addedCard ? `<div class="g-band">Dit nye garn</div>${resultCard(addedCard, m, i.name, !!project)}<div class="g-band">Forslag fra garnkataloget</div>` : ''}${res.length ? res.map((c) => resultCard(c, m, i.name, !!project)).join('') : (pairs.length ? '' : '<div class="placeholder">Ingen garner i garnkataloget ligger tæt nok på.</div>')}
+    ${pairs.length ? `<div class="g-band">Med to tråde holdt sammen</div>${pairs.map((c) => resultCard(c, m, i.name, !!project)).join('')}` : ''}`;
   const units = ['g', 'm', ...(i?.skein ? ['nøgler'] : [])];
   app.innerHTML = `
-    ${subHeader('Find alternativ', project ? `${project.pattern.title}` : i ? `til ${i.name} · ${num(Math.round(i.m50))} m pr. 50 g` : '')}
+    ${subHeader(project ? 'Vælg et alternativ' : 'Find alternativ', project ? `${project.pattern.title}` : i ? `til ${i.name} · ${num(Math.round(i.m50))} m pr. 50 g` : '')}
     <main class="g-page">
       <div class="g-label">Garnet i opskriften</div>
       ${project && !i ? '<div class="placeholder">Opskriftens garn er ikke i garnkataloget, og opskriften oplyser ikke løbelængden. Skriv dit garn under Materialer i stedet.</div>' : slot(a.ref, { act: 'pick', fixed: !!project })}
+      ${i && i.custom ? `<div class="g-fibre-ask">
+        <span class="g-small">${i.custom.fibre ? 'Fiber' : 'Hvilken fiber er garnet? Så bliver forslagene bedre.'}</span>
+        <div class="g-fibres">${[['uld', 'Uld / merino'], ['alpaka', 'Alpaka'], ['bomuld', 'Bomuld'], ['mohair', 'Mohair'], ['kashmir', 'Kashmir']].map(([k, l]) =>
+          `<button class="g-fib" data-setfib="${k}" aria-pressed="${i.custom.fibre === k}">${l}</button>`).join('')}</div></div>` : ''}
       ${i ? `
       <div class="g-amount">
         <span class="g-amount-title">Beregn hvor meget du skal bruge</span>
-        <span class="g-small">${project && project.sizeIndex != null && a.amount ? `Udfyldt fra opskriften: størrelse ${esc(project.pattern.sizes[project.sizeIndex])} bruger ca. ${num(a.amount)} m ${esc(i.name)}.`
+        <span class="g-small">${project && project.sizeIndex != null && a.patM ? `Udfyldt fra opskriften: størrelse ${esc(project.pattern.sizes[project.sizeIndex])} bruger ca. ${num(a.patM)} m ${esc(i.name)}.`
           : project ? 'Vælg en størrelse under Materialer, så udfylder Maskemakker mængden.' : `Skriv hvor meget ${esc(i.name)} opskriften bruger, så viser hvert forslag, hvor meget du skal købe.`}</span>
         <div class="g-amount-row"><input id="amt" inputmode="decimal" placeholder="Fx 200" value="${esc(a.amount)}" aria-label="Mængde ${esc(i.name)}">
           <div class="g-seg" role="group" aria-label="Enhed">${units.map((u) => `<button data-unit="${u}" aria-pressed="${a.unit === u}">${u}</button>`).join('')}</div></div>
         <span class="g-small" id="amt-m">${metres && a.unit !== 'm' ? `= ${num(Math.round(metres))} m` : ''}</span>
       </div>
-      <div class="g-toolbar"><span>${res.length ? `${res.length} forslag · tættest først` : ''}</span>
-        <label class="g-switch"><input type="checkbox" id="combos" ${a.combos ? 'checked' : ''}><span>To tråde</span></label></div>
-      ${i.custom && !i.custom.fibre ? '<p class="g-small">Fiberen kendes ikke, så forslagene ser kun på tykkelsen. Vælg „Skift“ og angiv fiberen for bedre forslag.</p>' : ''}
-      <div class="g-results" id="alt-res">${res.length ? res.map((c) => resultCard(c, metres, i.name, !!project)).join('') : '<div class="placeholder">Ingen garner i garnkataloget ligger tæt nok på. Prøv „To tråde“.</div>'}</div>
+      ${res.length && !addedCard ? `<div class="g-toolbar"><span>${res.length} forslag · tættest først</span></div>` : ''}
+      <div class="g-results" id="alt-res">${listHtml(metres)}</div>
+      <button class="import-row g-addrow" data-act="add-own">${I.plus}<span><b>Kan du ikke finde dit garn?</b><span>Tilføj det til garnkataloget</span></span></button>
       <p class="g-small">Forslagene er en vejledning. Strik altid en strikkeprøve.</p>` : '<p class="g-small">Vælg garnet fra opskriften, så finder Maskemakker garner med samme tykkelse.</p>'}
     </main>`;
   wireCommon(app);
   app.querySelector('[data-act="pick"]')?.addEventListener('click', async () => {
     const ref = await pickYarn({ title: 'Garnet i opskriften', ownList: list });
-    if (ref) { a.ref = ref; if (a.unit === 'nøgler' && !info(ref).skein) a.unit = 'g'; renderAlternative(); }
+    if (ref) { a.ref = ref; a.added = null; if (a.unit === 'nøgler' && !info(ref).skein) a.unit = 'g'; renderAlternative(); }
   });
   if (!i) return;
+  app.querySelector('[data-act="add-own"]').onclick = () => { S.add.back = true; C.go('#/garn/nyt'); };
+  // Yarn that isn't in the catalogue: choose its fibre right here (tap again to clear)
+  app.querySelectorAll('[data-setfib]').forEach((b) => (b.onclick = () => {
+    const f = b.dataset.setfib;
+    a.ref = { custom: { ...a.ref.custom, fibre: a.ref.custom.fibre === f ? '' : f } };
+    renderAlternative(project);
+  }));
   const amt = app.querySelector('#amt');
   amt.oninput = () => {
     a.amount = amt.value;
     const m = metresOf(i, a.amount, a.unit);
     app.querySelector('#amt-m').textContent = m && a.unit !== 'm' ? `= ${num(Math.round(m))} m` : '';
-    app.querySelector('#alt-res').innerHTML = res.length ? res.map((c) => resultCard(c, m, i.name, !!project)).join('') : app.querySelector('#alt-res').innerHTML;
+    app.querySelector('#alt-res').innerHTML = listHtml(m);
     wireCmpAndUse();
   };
   // Switching unit keeps the same length: 200 g Sunday → 940 m → 4 nøgler
@@ -475,7 +565,6 @@ async function renderAlternative(project = null) {
     a.unit = u;
     renderAlternative(project);
   }));
-  app.querySelector('#combos').onchange = (e) => { a.combos = e.target.checked; renderAlternative(project); };
   const wireCmp = () => app.querySelectorAll('[data-cmp]').forEach((b) => (b.onclick = () => {
     const m = metresOf(i, a.amount, a.unit);
     S.cmp.a = a.ref; S.cmp.b = { id: b.dataset.cmp }; if (m) S.cmp.metres = String(Math.round(m));
@@ -521,7 +610,7 @@ function verdict(A, B) {
 
 async function renderCompare() {
   const app = C.app;
-  await G.loadCatalog();
+  await ensure();
   const { list } = await mine();
   const c = S.cmp, A = info(c.a), B = info(c.b);
   let body = '';
@@ -591,7 +680,7 @@ async function renderCompare() {
 
 async function renderTogether() {
   const app = C.app;
-  await G.loadCatalog();
+  await ensure();
   const { list } = await mine();
   const s = S.sammen, A = info(s.a), B = info(s.b);
   const t = A && B ? G.targetOf(s.a, s.b) : null;
@@ -639,7 +728,7 @@ function skeinRange(r, yarnIdx, i) {
 
 async function renderKnit() {
   const app = C.app;
-  await G.loadCatalog();
+  await ensure();
   const { list, recipes } = await mine();
   const s = S.strikke, i = info(s.a);
   let body = '';
@@ -700,6 +789,8 @@ export function route(hash) {
     case 'y': return run(() => renderYarn(m[2]));
     case 'alternativ': return run(() => renderAlternative());
     case 'til': return run(() => openForProject(m[2]));
+    case 'nyt': return run(() => renderYarnForm());
+    case 'ret': return run(() => renderYarnForm(m[2]));
     case 'sammenlign': return run(renderCompare);
     case 'sammen': return run(renderTogether);
     case 'strikke': return run(renderKnit);

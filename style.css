@@ -85,6 +85,10 @@
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; background: var(--bg); color: var(--ink); }
+/* Every page is at least as tall as the screen. On an iPhone home-screen app, a page shorter than the
+   screen made the bottom menu stop short of the bottom edge (seen on Opskrifter with few patterns). */
+html { min-height: 100%; }
+body { min-height: 100vh; min-height: 100lvh; }
 body { font: 17px/1.45 var(--sans); -webkit-text-size-adjust: 100%; }
 button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
 a { color: inherit; }
@@ -896,3 +900,25 @@ body.no-scroll { overflow: hidden; }
 .pat-yarn-text { font-size: 14px; color: var(--muted); }
 .replaced-tag { font-size: 11px; font-weight: 700; border-radius: 99px; padding: 2px 8px; background: var(--line); color: var(--muted); }
 .my-yarns + .hint.top { margin-top: 14px; }
+
+/* the two yarn buttons side by side */
+.yarn-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0 2px; }
+.yarn-actions > :only-child { grid-column: 1 / -1; justify-self: start; }
+.yarn-actions .pill { margin: 0; justify-content: center; text-align: center; border-radius: 14px; padding: 10px 12px; line-height: 1.25; }
+.yarn-actions .pill svg { flex: none; }
+.yarn-actions + .hint.top, .yarn-actions + .hint + .hint.top { margin-top: 14px; }
+.g-fibre-ask { display: flex; flex-direction: column; gap: 6px; }
+
+/* your own yarns */
+.g-addrow { margin-top: 4px; }
+.g-addrow svg { width: 22px; height: 22px; flex: none; }
+.g-hint { font-size: 12px; color: var(--muted); font-weight: 400; }
+.g-unit { display: flex; align-items: center; gap: 6px; }
+.g-unit input { flex: 1; min-width: 0; }
+.g-unit em { font-style: normal; font-size: 13px; color: var(--muted); font-weight: 400; white-space: nowrap; }
+.g-btn.danger { color: var(--danger); border-color: var(--line); }
+.g-ownbtns { margin-top: 10px; }
+.my-field .g-hint { font-size: 12px; font-weight: 400; color: var(--muted); }
+.my-field .g-unit { font-size: inherit; font-weight: 400; color: inherit; }
+.my-field .g-unit em { font-size: 13px; }
+.my-field .g-ratio > span { font-size: 16px; font-weight: 400; color: var(--ink); }

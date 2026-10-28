@@ -284,6 +284,7 @@ fileInput.addEventListener('change', async () => {
     if (data.kind === 'strik-backup') {
       for (const p of data.projects || []) await store.saveProject(p);
       for (const r of data.recipes || []) await store.saveRecipe(r);
+      for (const y of data.yarns || []) await store.saveYarn(y);
       toast(`${(data.projects || []).length} projekt(er) gendannet`);
       route();
       return;
@@ -425,7 +426,8 @@ function shrinkImage(file, max) {
 async function exportBackup() {
   const projects = await store.listProjects();
   const recipes = await store.listRecipes();
-  const json = JSON.stringify({ kind: 'strik-backup', exported: new Date().toISOString(), projects, recipes }, null, 2);
+  const yarns = await store.listYarns();   // your own yarns in the garnkatalog
+  const json = JSON.stringify({ kind: 'strik-backup', exported: new Date().toISOString(), projects, recipes, yarns }, null, 2);
   const name = `maskemakker-backup-${new Date().toISOString().slice(0, 10)}.json`;
   const file = new File([json], name, { type: 'application/json' });
   if (navigator.canShare?.({ files: [file] })) {
@@ -761,8 +763,8 @@ function renderMaterials(body, project, prev = null) {
         </details>
       </div>`;
     }).join('')}
-    <button class="pill my-add" id="my-add">${plusIcon}${project.myYarns.length ? 'Tilføj et garn mere' : 'Tilføj et andet garn manuelt'}</button>
-    ${project.myYarns.length ? '<p class="hint">Opskriften ændrer sig ikke. Dit garn vises på projektkortet, når du er færdig.</p>' : ''}`;
+`;
+  const ownHint = project.myYarns.length ? '<p class="hint">Opskriften ændrer sig ikke. Dit garn vises på projektkortet, når du er færdig.</p>' : '';
 
   // Yarn: when the pattern suggests several, you pick the one you use
   const yarnOpts = pat.yarn || [];
@@ -786,7 +788,7 @@ function renderMaterials(body, project, prev = null) {
     <div class="panel pat-yarns">${yarnOpts.map((y, i) => `
       <div class="list-row"><span class="pat-yarn-name"><b>${esc(y.name)}</b>${i === replacedIdx ? '<span class="replaced-tag">Erstattet</span>' : ''}</span>${y.text ? `<span class="pat-yarn-text">${renderText(y.text, si)}</span>` : ''}</div>`).join('')}
     </div>` : '';
-  const findPill = yarnOpts.length ? `<button class="pill my-find" id="find-alt">${searchIcon}${hasOwn ? 'Find et andet alternativ' : `Find et alternativ til ${esc(patternYarns(project)[0].name.split(/\s+fra\s+/i)[0])}`}</button>` : '';
+  const findPill = yarnOpts.length ? `<button class="pill my-find" id="find-alt">${searchIcon}${hasOwn ? 'Vælg et andet alternativ' : `Vælg et alternativ til ${esc(patternYarns(project)[0].name.split(/\s+fra\s+/i)[0])}`}</button>` : '';
 
   // Needles: the pattern's needle stays visible; you can record that you use another size
   project.needles = project.needles || {};
@@ -857,7 +859,8 @@ function renderMaterials(body, project, prev = null) {
         ${sizeInfo}` : ''}
       ${materials ? `<h3 class="block-title">Garn og pinde</h3><div class="panel">${materials}</div>` : ''}
       <h3 class="block-title">Garn</h3>
-      ${hasOwn ? `<div class="my-yarns">${myYarnHtml}</div>${patternYarnInfo}${findPill}` : `${yarnHtml}${findPill}<div class="my-yarns">${myYarnHtml}</div>`}
+      ${hasOwn ? `<div class="my-yarns">${myYarnHtml}</div><div class="yarn-actions">${findPill}</div>${ownHint}${patternYarnInfo}`
+        : `${yarnHtml}<div class="my-yarns">${myYarnHtml}</div><div class="yarn-actions">${findPill}</div>${ownHint}`}
       ${(pat.notions || []).length ? `<h3 class="block-title">Tilbehør</h3><div class="panel">${pat.notions.map((n) => `<div class="list-row">${renderText(n.text, si)}</div>`).join('')}</div>` : ''}
       ${needleHtml ? `<h3 class="block-title">Pinde</h3><div class="panel">${needleHtml}</div>
         ${anyNeedleChanged ? '<p class="hint">Opskriften ændrer sig ikke, når du bruger en anden pind. Tjek gerne strikkefastheden.</p>' : ''}` : ''}
@@ -875,6 +878,7 @@ function renderMaterials(body, project, prev = null) {
     const idx = () => Math.round(strip.scrollLeft / strip.clientWidth);
     const sync = () => {
       const i = idx();
+      galleryAt = { pid: project.id, i };
       body.querySelector('#gal-prev').hidden = i === 0;
       body.querySelector('#gal-next').hidden = i === gal.length - 1;
       body.querySelector('#gal-count').textContent = `${i + 1} / ${gal.length}`;
@@ -883,6 +887,11 @@ function renderMaterials(body, project, prev = null) {
     body.querySelector('#gal-prev').onclick = () => goTo(idx() - 1);
     body.querySelector('#gal-next').onclick = () => goTo(idx() + 1);
     strip.addEventListener('scroll', () => requestAnimationFrame(sync), { passive: true });
+    // Stay on the photo you were looking at when Materialer is redrawn (e.g. after choosing a size)
+    if (galleryAt?.pid === project.id && galleryAt.i > 0) {
+      const i = Math.min(galleryAt.i, gal.length - 1);
+      requestAnimationFrame(() => { strip.scrollLeft = i * strip.clientWidth; sync(); });
+    }
   }
 
   body.querySelectorAll('[data-size]').forEach((b) => b.onclick = async () => {
@@ -1603,7 +1612,11 @@ function go(hash) {
   else location.hash = hash;
 }
 
+/** The photo you're on in a pattern's gallery; forgotten when you go to another screen. */
+let galleryAt = null;
+
 function route() {
+  galleryAt = null;
   if (window.__recipeScroll) window.removeEventListener('scroll', window.__recipeScroll);
   window.__recipeScroll = null;
   const m = location.hash.match(/^#\/p\/([^/]+)(?:\/(\w+))?$/);
@@ -1647,7 +1660,7 @@ const mailIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 
 // The Garnvælger (garn-ui.js) borrows these from here.
 GU.init({
-  app, store, esc, go, toast, openSheet, daDate, isFinished, yarnAmount, patternYarns, ownYarns, releaseWakeLock,
+  app, store, esc, go, toast, openSheet, ask, daDate, isFinished, yarnAmount, patternYarns, ownYarns, releaseWakeLock,
   tabbar, homeHeader, wireHomeHeader,
   icons: { back: backIcon, chevronRight, check: checkIcon },
   recipeThumb: (r) => (r.pattern.photo ? `<img class="rec-pic" src="${r.pattern.photo}" alt="">` : '<span class="rec-pic rec-empty"><img src="icons/knot.png" alt=""></span>'),
