@@ -761,7 +761,7 @@ function renderMaterials(body, project, prev = null) {
         </details>
       </div>`;
     }).join('')}
-    <button class="pill my-add" id="my-add">${plusIcon}${project.myYarns.length ? 'Tilføj et garn mere' : 'Jeg bruger et andet garn'}</button>
+    <button class="pill my-add" id="my-add">${plusIcon}${project.myYarns.length ? 'Tilføj et garn mere' : 'Tilføj et andet garn manuelt'}</button>
     ${project.myYarns.length ? '<p class="hint">Opskriften ændrer sig ikke. Dit garn vises på projektkortet, når du er færdig.</p>' : ''}`;
 
   // Yarn: when the pattern suggests several, you pick the one you use
