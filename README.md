@@ -8,7 +8,7 @@ A home-screen web app for iPhone. Progress is saved on the phone only.
 |---|---|
 | `index.html` | The page itself |
 | `app.js` | Screens, tabs, ticking rows, size switching, import |
-| `storage.js` | **The only file that saves data.** In version 2 we swap its insides for a database |
+| `storage.js` | **The only file that saves data.** Projects, patterns and your own yarns are kept in the browser's database (IndexedDB), which has room for hundreds of MB. Older versions used localStorage (about 5 MB, which a few patterns with photos filled up); the data is moved over automatically the first time. In version 2 we swap its insides for an online database |
 | `garn.js` | Garnvælger: loads the yarn catalogue and finds alternatives (no screens) |
 | `garn-ui.js` | Garnvælger screens: the Garn tab, catalogue, a yarn's page, Find alternativ, Sammenlign, To garner sammen, Hvad kan jeg strikke? |
 | `yarns.json` | The yarn catalogue (Drops and Sandnes Garn). Facts only, safe to upload to GitHub |
