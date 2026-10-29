@@ -8,7 +8,7 @@ const photoInput = document.getElementById('photo-input');
 const sheet = document.getElementById('sheet');
 
 const TABS = ['materialer', 'teknikker', 'opskrift'];
-const APP_VERSION = '28. oktober 2026';
+const APP_VERSION = '29. oktober 2026';
 const CONTACT_EMAIL = 'contact@maskemakker.com';   // MM-20: replace with the real address
 
 /* ---------- helpers ---------- */
@@ -768,7 +768,13 @@ function renderMaterials(body, project, prev = null) {
 
   // Yarn: when the pattern suggests several, you pick the one you use
   const yarnOpts = pat.yarn || [];
-  const yarnHtml = yarnOpts.length > 1 ? `
+  // Some patterns knit two yarns held together (pat.yarnTogether): both are needed, so there's nothing to pick
+  const together = pat.yarnTogether && yarnOpts.length > 1;
+  const yarnHtml = together ? `
+    <p class="hint top">Strikkes med ${yarnOpts.length === 2 ? 'de to' : 'alle'} garner holdt sammen.</p>
+    <div class="panel">${yarnOpts.map((y) => `
+      <div class="list-row"><b>${esc(y.name)}</b>${y.text ? `<br>${renderText(y.text, si)}` : ''}</div>`).join('')}
+    </div>` : yarnOpts.length > 1 ? `
     <p class="hint top">Opskriften foreslår ${yarnOpts.length} garner. Vælg det, du bruger.</p>
     <div class="choice-list" role="radiogroup">
       ${yarnOpts.map((y, i) => `
@@ -788,7 +794,7 @@ function renderMaterials(body, project, prev = null) {
     <div class="panel pat-yarns">${yarnOpts.map((y, i) => `
       <div class="list-row"><span class="pat-yarn-name"><b>${esc(y.name)}</b>${i === replacedIdx ? '<span class="replaced-tag">Erstattet</span>' : ''}</span>${y.text ? `<span class="pat-yarn-text">${renderText(y.text, si)}</span>` : ''}</div>`).join('')}
     </div>` : '';
-  const findPill = yarnOpts.length ? `<button class="pill my-find" id="find-alt">${searchIcon}${hasOwn ? 'Vælg et andet alternativ' : `Vælg et alternativ til ${esc(patternYarns(project)[0].name.split(/\s+fra\s+/i)[0])}`}</button>` : '';
+  const findPill = yarnOpts.length && !together ? `<button class="pill my-find" id="find-alt">${searchIcon}${hasOwn ? 'Vælg et andet alternativ' : `Vælg et alternativ til ${esc(patternYarns(project)[0].name.split(/\s+fra\s+/i)[0])}`}</button>` : '';
 
   // Needles: the pattern's needle stays visible; you can record that you use another size
   project.needles = project.needles || {};
@@ -1390,6 +1396,7 @@ function yarnsUsed(p) {
 /** The pattern's yarn: your choice when it suggests several. */
 function patternYarns(p) {
   const ys = p.pattern.yarn || [];
+  if (p.pattern.yarnTogether) return ys;   // two yarns held together: you use them all
   if (ys.length > 1 && p.yarnChoice != null && ys[p.yarnChoice]) return [ys[p.yarnChoice]];
   return ys.slice(0, 1);
 }
@@ -1403,6 +1410,8 @@ function yarnAmount(p) {
   // With your own yarn: show the metres the pattern calls for (the metres needed barely change
   // with another yarn), but never the pattern's grams, which wouldn't fit your yarn.
   const own = ownYarns(p).length > 0;
+  // Two yarns held together: each has its own amount, so a single total would mislead
+  if (p.pattern.yarnTogether && !own && (p.pattern.yarn || []).length > 1) return null;
   let m = 0, g = 0, allM = true, any = false;
   const num = (x) => { const [a, b] = x.split('-').map((v) => parseFloat(v.replace(',', '.'))); return b ? (a + b) / 2 : a; };
   for (const y of patternYarns(p)) {
